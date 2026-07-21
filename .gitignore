@@ -1,0 +1,22 @@
+# Python
+backend/venv/
+backend/__pycache__/
+*.pyc
+
+# Database
+backend/hospital.db
+
+# Environment
+.env
+*.env
+
+# React
+frontend/node_modules/
+frontend/build/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
