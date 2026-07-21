@@ -208,6 +208,11 @@ def seed_database():
 
     db.session.commit()
 
+# Initialize database
+with app.app_context():
+    db.create_all()
+    seed_database()
+
 
 # ─── Dashboard Stats ──────────────────────────────────────────────────────────
 
