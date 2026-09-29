@@ -20,13 +20,21 @@ const titles = {
 export default function Topbar() {
   const loc = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
 
   const [title, sub] = titles[loc.pathname] || ['MediCore', ''];
   const now = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const [pwdModal, setPwdModal] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const isMustChange = Boolean(user?.must_change_password);
+
+  useEffect(() => {
+    if (user?.must_change_password) {
+      setPwdModal(true);
+    }
+  }, [user?.must_change_password]);
 
   // Change password state
   const [pwdForm, setPwdForm] = useState({
@@ -47,6 +55,11 @@ export default function Topbar() {
     try {
       const res = await changePassword(pwdForm);
       toast.success(res.data.message || 'Password changed successfully');
+      if (res.data.user) {
+        updateUser(res.data.user);
+      } else if (user) {
+        updateUser({ ...user, must_change_password: false });
+      }
       setPwdModal(false);
       setPwdForm({ current_password: '', new_password: '', confirm_password: '' });
     } catch (err) {
@@ -103,31 +116,43 @@ export default function Topbar() {
       {/* ─── Change Password Modal ─── */}
       {pwdModal && (
         <Modal
-          title="Change Password"
-          onClose={() => setPwdModal(false)}
+          title={isMustChange ? "First Login Security Notice" : "Change Password"}
+          onClose={isMustChange ? undefined : () => setPwdModal(false)}
           footer={
             <>
-              <button className="btn btn-outline" onClick={() => setPwdModal(false)}>
-                Cancel
-              </button>
+              {isMustChange ? (
+                <button className="btn btn-outline" style={{ color: 'var(--coral)', borderColor: 'var(--coral)' }} onClick={handleLogout}>
+                  Sign Out
+                </button>
+              ) : (
+                <button className="btn btn-outline" onClick={() => setPwdModal(false)}>
+                  Cancel
+                </button>
+              )}
               <button className="btn btn-primary" onClick={handleChangePassword} disabled={loading}>
-                {loading ? 'Updating…' : 'Save New Password'}
+                {loading ? 'Updating…' : (isMustChange ? 'Set My Password & Continue' : 'Save New Password')}
               </button>
             </>
           }
         >
           <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
-              Update your account password securely.
-            </p>
+            {isMustChange ? (
+              <div style={{ padding: '12px 14px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, fontSize: '0.85rem', color: '#92400e', lineHeight: 1.45 }}>
+                <strong>Mandatory Password Update:</strong> Your account was initialized or reset by an administrator. For your security, please verify your temporary initial password and choose your own personal password to proceed.
+              </div>
+            ) : (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                Update your account password securely.
+              </p>
+            )}
 
             <div className="form-group">
-              <label className="form-label">Current Password *</label>
+              <label className="form-label">{isMustChange ? 'Temporary / Initial Password *' : 'Current Password *'}</label>
               <input
                 required
                 type="password"
                 className="form-control"
-                placeholder="Enter your current password"
+                placeholder={isMustChange ? 'Enter temporary password assigned by Admin' : 'Enter your current password'}
                 value={pwdForm.current_password}
                 onChange={(e) => setPwdForm({ ...pwdForm, current_password: e.target.value })}
               />
@@ -139,7 +164,7 @@ export default function Topbar() {
                 required
                 type="password"
                 className="form-control"
-                placeholder="Enter new password"
+                placeholder="Enter new personal password"
                 value={pwdForm.new_password}
                 onChange={(e) => setPwdForm({ ...pwdForm, new_password: e.target.value })}
               />
@@ -151,7 +176,7 @@ export default function Topbar() {
                 required
                 type="password"
                 className="form-control"
-                placeholder="Confirm new password"
+                placeholder="Confirm new personal password"
                 value={pwdForm.confirm_password}
                 onChange={(e) => setPwdForm({ ...pwdForm, confirm_password: e.target.value })}
               />

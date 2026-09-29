@@ -26,15 +26,28 @@ def get_single_staff(sid):
     return jsonify(staff.to_dict()), 200
 
 
+def get_next_staff_code(prefix):
+    existing = [s.code for s in Staff.query.filter(Staff.code.like(f"{prefix}-%")).all() if s.code]
+    max_num = 0
+    for c in existing:
+        try:
+            num = int(c.split("-")[-1])
+            if num > max_num:
+                max_num = num
+        except (ValueError, IndexError):
+            pass
+    return format_code(prefix, max_num + 1)
+
+
 @staff_bp.route("", methods=["POST"])
 @login_required
 @role_required("admin")
 def create_staff():
     """
-    Register a new staff member with auto-generated NUR-xxxx or STF-xxxx code
+    Register a new staff member with auto-generated NUR-xxxx or REC-xxxx code
     and linked User authentication account (Admin only).
-    Admin manually provides: Staff Name, Username, Initial Password, Role.
-    System automatically generates: Unique Staff/Nurse ID.
+    Admin manually provides: Staff Name, Username, Initial Password, Role (Nurse or Receptionist).
+    System automatically generates: Unique Staff ID (NUR-xxxx or REC-xxxx).
     """
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
@@ -46,6 +59,10 @@ def create_staff():
 
     if not name or not role:
         return jsonify({"error": "Staff name and role are required"}), 400
+
+    # Strict staff role restriction: Only Nurse and Receptionist
+    if role not in ("Nurse", "Receptionist", "Head Nurse"):
+        return jsonify({"error": "Invalid role. The staff role must be either 'Nurse' or 'Receptionist'."}), 400
 
     if not username or not password:
         return jsonify({"error": "Username and initial password are required to create a staff account"}), 400
@@ -63,25 +80,22 @@ def create_staff():
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already exists. Please choose another username."}), 409
 
-    # Determine role for user account
+    # Determine role and code prefix: NUR for Nurse, REC for Receptionist
     role_lower = role.lower()
-    if "nurse" in role_lower:
-        user_role = "nurse"
-    elif "reception" in role_lower:
+    if "reception" in role_lower:
         user_role = "receptionist"
+        prefix = "REC"
     else:
         user_role = "nurse"
+        prefix = "NUR"
 
-    # Auto-generate staff code: NUR-xxxx for nurses, STF-xxxx for other staff
-    next_id = (db.session.query(db.func.max(Staff.id)).scalar() or 0) + 1
-    prefix = "NUR" if "nurse" in role_lower else "STF"
-    code = format_code(prefix, next_id)
+    code = get_next_staff_code(prefix)
 
     # Validate or generate email
     if not email:
         email = f"{username.lower()}@hospital.com"
         if User.query.filter_by(email=email).first():
-            email = f"{username.lower()}{next_id}@hospital.com"
+            email = f"{username.lower()}_{prefix.lower()}@hospital.com"
     else:
         if User.query.filter_by(email=email).first():
             return jsonify({"error": "Email is already registered. Please provide a different email address."}), 409
@@ -107,6 +121,7 @@ def create_staff():
             email=email,
             role=user_role,
             staff_id=staff.id,
+            must_change_password=True,
         )
         user.set_password(password)
         db.session.add(user)
@@ -137,7 +152,7 @@ def create_staff():
 def reset_staff_password(sid):
     """
     Admin-only endpoint to reset the login password for a Staff member.
-    Validates new password, hashes with bcrypt, and updates User account.
+    Validates new password, hashes with bcrypt, and requires password change on next login.
     """
     staff = Staff.query.get_or_404(sid)
     user = User.query.filter((User.staff_id == sid) | (User.id == staff.user_id)).first()
@@ -159,6 +174,7 @@ def reset_staff_password(sid):
         return jsonify({"error": "New password and confirmation do not match"}), 400
 
     user.set_password(new_password)
+    user.must_change_password = True
     db.session.commit()
 
     return jsonify({

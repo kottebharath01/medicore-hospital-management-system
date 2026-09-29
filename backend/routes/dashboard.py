@@ -40,6 +40,8 @@ def get_dashboard():
     scheduled_appts = Appointment.query.filter(Appointment.status.in_(["Scheduled", "Confirmed"])).count()
     total_wards = Ward.query.count()
     total_staff = Staff.query.count()
+    total_nurses = Staff.query.filter(Staff.role.ilike("%nurse%")).count()
+    total_receptionists = Staff.query.filter(Staff.role.ilike("%reception%")).count()
     total_departments = Department.query.count()
 
     # Eager load relationships to prevent N+1 queries
@@ -66,6 +68,8 @@ def get_dashboard():
             "total_beds": total_beds,
             "available_beds": available_beds,
             "total_staff": total_staff,
+            "total_nurses": total_nurses,
+            "total_receptionists": total_receptionists,
             "total_departments": total_departments,
         },
         "recent_appointments": [a.to_dict() for a in recent_appointments],

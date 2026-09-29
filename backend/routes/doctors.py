@@ -46,6 +46,19 @@ def get_doctor(did):
     return jsonify(data), 200
 
 
+def get_next_doctor_code():
+    existing = [d.code for d in Doctor.query.filter(Doctor.code.like("DOC-%")).all() if d.code]
+    max_num = 0
+    for c in existing:
+        try:
+            num = int(c.split("-")[-1])
+            if num > max_num:
+                max_num = num
+        except (ValueError, IndexError):
+            pass
+    return format_code("DOC", max_num + 1)
+
+
 @doctors_bp.route("", methods=["POST"])
 @login_required
 @role_required("admin")
@@ -82,15 +95,14 @@ def create_doctor():
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "Username already exists. Please choose another username."}), 409
 
-    # Generate or validate email
-    next_id = (db.session.query(db.func.max(Doctor.id)).scalar() or 0) + 1
-    code = format_code("DOC", next_id)
+    # Generate next sequential DOC-xxxx code
+    code = get_next_doctor_code()
 
     if not email:
         email = f"{username.lower()}@hospital.com"
         # Avoid conflict if default email happens to exist
         if User.query.filter_by(email=email).first():
-            email = f"{username.lower()}{next_id}@hospital.com"
+            email = f"{username.lower()}_{code.lower().replace('-', '_')}@hospital.com"
     else:
         if User.query.filter_by(email=email).first():
             return jsonify({"error": "Email is already registered. Please provide a different email address."}), 409
@@ -117,6 +129,7 @@ def create_doctor():
             email=email,
             role="doctor",
             doctor_id=doctor.id,
+            must_change_password=True,
         )
         user.set_password(password)
         db.session.add(user)
@@ -148,7 +161,7 @@ def create_doctor():
 def reset_doctor_password(did):
     """
     Admin-only endpoint to reset the login password for a Doctor account.
-    Validates new password, hashes with bcrypt, and invalidates old password.
+    Validates new password, hashes with bcrypt, and requires password change on next login.
     """
     doctor = Doctor.query.get_or_404(did)
     user = User.query.filter((User.doctor_id == did) | (User.id == doctor.user_id)).first()
@@ -172,6 +185,7 @@ def reset_doctor_password(did):
         return jsonify({"error": "New password and confirmation do not match"}), 400
 
     user.set_password(new_password)
+    user.must_change_password = True
     db.session.commit()
 
     return jsonify({

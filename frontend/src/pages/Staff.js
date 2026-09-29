@@ -32,18 +32,7 @@ const EMPTY = {
   shift: 'Morning',
 };
 
-const ROLES = [
-  'Head Nurse',
-  'Nurse',
-  'Receptionist',
-  'Lab Technician',
-  'Pharmacist',
-  'Radiologist',
-  'Physiotherapist',
-  'Ward Attendant',
-  'Cleaner',
-  'Security Officer',
-];
+const ROLES = ['Nurse', 'Receptionist'];
 
 const SHIFTS = ['Morning', 'Evening', 'Night', 'Rotating'];
 
@@ -313,7 +302,7 @@ export default function Staff() {
                   <tr key={s.id}>
                     <td>
                       <span className="badge badge-blue">
-                        {s.code || (s.role.toLowerCase().includes('nurse') ? `NUR-${String(s.id).padStart(4, '0')}` : `STF-${String(s.id).padStart(4, '0')}`)}
+                        {s.code || (s.role.toLowerCase().includes('nurse') ? `NUR-${String(s.id).padStart(4, '0')}` : `REC-${String(s.id).padStart(4, '0')}`)}
                       </span>
                     </td>
                     <td>
@@ -402,7 +391,7 @@ export default function Staff() {
                 <ShieldCheck size={18} />
                 <span>
                   Admin enters the Staff member's <strong>Username</strong> and <strong>Initial Password</strong>.
-                  The system automatically assigns the unique <strong>Staff ID (NUR-xxxx / STF-xxxx)</strong>.
+                  The system automatically assigns the unique <strong>Staff ID (NUR-xxxx for Nurse, REC-xxxx for Receptionist)</strong>.
                 </span>
               </div>
             </div>

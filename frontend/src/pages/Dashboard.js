@@ -132,10 +132,11 @@ export default function Dashboard() {
   const bedPct = stats.total_beds ? Math.round((stats.occupied_beds / stats.total_beds) * 100) : 0;
 
   const pieData = [
-    { name: 'Scheduled', value: stats.scheduled_appointments },
-    { name: 'Available Doctors', value: stats.available_doctors },
-    { name: 'Occupied Beds', value: stats.occupied_beds },
-    { name: 'Staff', value: stats.total_staff },
+    { name: 'Doctors', value: stats.total_doctors || 0 },
+    { name: 'Nurses', value: stats.total_nurses || 0 },
+    { name: 'Receptionists', value: stats.total_receptionists || 0 },
+    { name: 'Occupied Beds', value: stats.occupied_beds || 0 },
+    { name: 'Scheduled Appts', value: stats.scheduled_appointments || 0 },
   ];
 
   return (
@@ -170,7 +171,7 @@ export default function Dashboard() {
               )}
               {user?.role === 'admin' && (
                 <span>
-                  Hospital Administrator • Full access to users, doctors, clinical departments, wards, and reporting.
+                  Hospital Administrator • System oversight, staff credential governance, clinical departments, and operational monitoring.
                 </span>
               )}
               {!user && (
@@ -230,6 +231,22 @@ export default function Dashboard() {
           onClick={() => nav('/doctors')}
         />
         <StatCard
+          icon={HeartPulse}
+          label="Nurses"
+          value={stats.total_nurses}
+          color="green"
+          clickable={true}
+          onClick={() => nav('/staff')}
+        />
+        <StatCard
+          icon={UserCog}
+          label="Receptionists"
+          value={stats.total_receptionists}
+          color="purple"
+          clickable={true}
+          onClick={() => nav('/staff')}
+        />
+        <StatCard
           icon={CalendarClock}
           label="Today's Visits"
           value={stats.today_appointments}
@@ -257,7 +274,7 @@ export default function Dashboard() {
           icon={Building2}
           label="Departments"
           value={stats.total_departments || 7}
-          color="green"
+          color="blue"
           clickable={true}
           onClick={() => nav('/departments')}
         />

@@ -197,8 +197,12 @@ def change_password():
         return jsonify({"error": "New password and confirmation do not match"}), 400
 
     user.set_password(new_password)
+    user.must_change_password = False
     db.session.commit()
-    return jsonify({"message": "Password changed successfully! Please use your new password next time you sign in."}), 200
+    return jsonify({
+        "message": "Password changed successfully! You may now use your new password.",
+        "user": user.to_dict()
+    }), 200
 
 
 @users_bp.route("", methods=["GET"])

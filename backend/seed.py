@@ -24,6 +24,12 @@ def run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS doctor_id INTEGER;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS patient_id INTEGER;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_id INTEGER;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;",
+        "UPDATE staff SET role = 'Nurse' WHERE role ILIKE '%nurse%' AND role != 'Nurse';",
+        "UPDATE staff SET role = 'Receptionist' WHERE role ILIKE '%reception%' AND role != 'Receptionist';",
+        "UPDATE staff SET role = 'Receptionist' WHERE role IN ('Cleaner', 'Security Officer', 'Ward Attendant', 'Lab Technician', 'Pharmacist');",
+        "UPDATE staff SET code = REPLACE(code, 'STF-', 'REC-') WHERE role = 'Receptionist' AND code LIKE 'STF-%';",
+        "UPDATE staff SET code = REPLACE(code, 'STF-', 'NUR-') WHERE role = 'Nurse' AND code LIKE 'STF-%';",
     ]
     for stmt in statements:
         try:
@@ -178,21 +184,18 @@ def seed_database():
                 bed_counter += 1
         db.session.commit()
 
-    # 6. Staff
+    # 6. Staff (Only Nurse and Receptionist)
     default_staff = [
-        ("Kavitha Nair", "Head Nurse", "Emergency & ICU", "9000000001", "kavitha@hospital.com", "Morning"),
-        ("Prakash Babu", "Lab Technician", "Cardiology", "9000000002", "prakash@hospital.com", "Morning"),
-        ("Rekha Varma", "Pharmacist", "Emergency & ICU", "9000000003", "rekha@hospital.com", "Evening"),
-        ("Sunil Mehta", "Receptionist", "Emergency & ICU", "9000000004", "sunil@hospital.com", "Morning"),
-        ("Divya Krishna", "Nurse", "Pediatrics", "9000000005", "divya@hospital.com", "Night"),
+        ("Kavitha Nair", "Nurse", "Emergency & ICU", "9000000001", "kavitha@hospital.com", "Morning", "NUR-0001"),
+        ("Sunil Mehta", "Receptionist", "Emergency & ICU", "9000000004", "sunil@hospital.com", "Morning", "REC-0001"),
+        ("Divya Krishna", "Nurse", "Pediatrics", "9000000005", "divya@hospital.com", "Night", "NUR-0002"),
     ]
-    for idx, (name, role, dept_str, phone, email, shift) in enumerate(default_staff, 1):
+    for idx, (name, role, dept_str, phone, email, shift, staff_code) in enumerate(default_staff, 1):
         stf = Staff.query.filter_by(email=email).first()
         dept_id = dept_map.get(dept_str)
-        prefix = "NUR" if "nurse" in role.lower() else "STF"
         if not stf:
             stf = Staff(
-                code=format_code(prefix, idx),
+                code=staff_code,
                 name=name,
                 role=role,
                 department_id=dept_id,
@@ -203,8 +206,8 @@ def seed_database():
             )
             db.session.add(stf)
         else:
-            if not stf.code:
-                stf.code = format_code(prefix, stf.id)
+            stf.role = role
+            stf.code = staff_code
             if not stf.department_id:
                 stf.department_id = dept_id
     db.session.commit()

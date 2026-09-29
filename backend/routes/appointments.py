@@ -7,6 +7,20 @@ from routes.auth import get_current_user_from_request, login_required
 appointments_bp = Blueprint("appointments", __name__, url_prefix="/api/appointments")
 
 
+def get_next_appointment_code():
+    """Generate next sequential APT-xxxx code."""
+    existing = [a.code for a in Appointment.query.filter(Appointment.code.like("APT-%")).all() if a.code]
+    max_num = 0
+    for c in existing:
+        try:
+            num = int(c.split("-")[-1])
+            if num > max_num:
+                max_num = num
+        except (ValueError, IndexError):
+            pass
+    return format_code("APT", max_num + 1)
+
+
 @appointments_bp.route("", methods=["GET"])
 @login_required
 def get_appointments():
@@ -14,7 +28,7 @@ def get_appointments():
     List appointments with role-based filtering and eager loading.
     - Patient role: Automatically restricted to their own appointments only.
     - Doctor role: Automatically restricted to their own assigned appointments.
-    - Admin/Receptionist: Access all appointments with optional filters.
+    - Admin/Receptionist/Nurse: Access all appointments with optional filters.
     """
     user = g.current_user
     status = request.args.get("status", "").strip()
@@ -40,7 +54,7 @@ def get_appointments():
     # Query param filters
     if status:
         query = query.filter_by(status=status)
-    if doctor_id and (not user or user.role != "doctor"):
+    if doctor_id and (not user or user.role not in ("doctor", "patient")):
         query = query.filter_by(doctor_id=int(doctor_id))
     if patient_id and (not user or user.role != "patient"):
         query = query.filter_by(patient_id=int(patient_id))
@@ -93,13 +107,24 @@ def get_appointment(aid):
 def create_appointment():
     """
     Schedule an appointment.
-    If authenticated as a Patient, patient_id is automatically obtained from the account.
+    STRICT ROLE RULE:
+    - Patient: Self-booking for their own patient account.
+    - Receptionist: Scheduling for walk-in or phone patients.
+    - Admin & Other Roles: FORBIDDEN. Admin monitors only.
     """
     user = g.current_user
+    if not user or user.role not in ("patient", "receptionist"):
+        return jsonify({
+            "error": "Forbidden",
+            "message": "Only Patients (for self-booking) and Receptionists (for front-desk scheduling) are authorized to create appointments. Admin cannot create operational appointments."
+        }), 403
+
     data = request.get_json() or {}
 
     # Auto-resolve patient_id for patient accounts
-    if user and user.role == "patient":
+    if user.role == "patient":
+        if not user.patient_id:
+            return jsonify({"error": "Patient profile not found for this account"}), 400
         patient_id = user.patient_id
     else:
         patient_id = data.get("patient_id")
@@ -147,8 +172,7 @@ def create_appointment():
     except ValueError:
         return jsonify({"error": "Invalid date format. Expected YYYY-MM-DD"}), 400
 
-    next_id = (db.session.query(db.func.max(Appointment.id)).scalar() or 0) + 1
-    code = format_code("APT", next_id)
+    code = get_next_appointment_code()
 
     appt = Appointment(
         code=code,
@@ -176,13 +200,29 @@ def create_appointment():
 @appointments_bp.route("/<int:aid>", methods=["PUT"])
 @login_required
 def update_appointment(aid):
-    """Update appointment status (Scheduled, Confirmed, Completed, Cancelled) or details."""
+    """
+    Update appointment status or details.
+    - Patient: Can only cancel their own appointment.
+    - Doctor: Can update status of their assigned appointments.
+    - Receptionist / Admin: Can update status or reschedule.
+    """
     user = g.current_user
     appt = Appointment.query.get_or_404(aid)
 
     # Normal patient can only cancel their own appointment
-    if user and user.role == "patient" and user.patient_id != appt.patient_id:
-        return jsonify({"error": "Forbidden", "message": "You cannot modify another patient's appointment"}), 403
+    if user and user.role == "patient":
+        if user.patient_id != appt.patient_id:
+            return jsonify({"error": "Forbidden", "message": "You cannot modify another patient's appointment"}), 403
+        data = request.get_json() or {}
+        if data.get("status") and data["status"] != "Cancelled":
+            return jsonify({"error": "Forbidden", "message": "Patients may only cancel their own appointments"}), 403
+        appt.status = "Cancelled"
+        db.session.commit()
+        return jsonify(appt.to_dict()), 200
+
+    # Doctor can only update status of their own appointments
+    if user and user.role == "doctor" and user.doctor_id != appt.doctor_id:
+        return jsonify({"error": "Forbidden", "message": "You can only update your own assigned consultations"}), 403
 
     data = request.get_json() or {}
 
@@ -216,6 +256,9 @@ def delete_appointment(aid):
 
     if user and user.role == "patient" and user.patient_id != appt.patient_id:
         return jsonify({"error": "Forbidden", "message": "You cannot delete another patient's appointment"}), 403
+
+    if user and user.role not in ("admin", "receptionist", "patient"):
+        return jsonify({"error": "Forbidden", "message": "You are not authorized to delete appointments"}), 403
 
     db.session.delete(appt)
     db.session.commit()

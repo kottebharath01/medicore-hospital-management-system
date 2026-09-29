@@ -21,6 +21,7 @@ class User(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey("patients.id", ondelete="SET NULL"), nullable=True)
     doctor_id = db.Column(db.Integer, db.ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True)
     staff_id = db.Column(db.Integer, db.ForeignKey("staff.id", ondelete="SET NULL"), nullable=True)
+    must_change_password = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     patient = db.relationship("Patient", foreign_keys=[patient_id], uselist=False)
@@ -36,7 +37,8 @@ class User(db.Model):
     def to_dict(self):
         pat_code = self.patient.code if self.patient else (format_code("PAT", self.patient_id) if self.patient_id else None)
         doc_code = self.doctor.code if self.doctor else (format_code("DOC", self.doctor_id) if self.doctor_id else None)
-        stf_code = self.staff.code if self.staff else (format_code("STF", self.staff_id) if self.staff_id else None)
+        prefix = "REC" if self.role == "receptionist" else ("NUR" if self.role == "nurse" else "STF")
+        stf_code = self.staff.code if self.staff else (format_code(prefix, self.staff_id) if self.staff_id else None)
         return {
             "id": self.id,
             "username": self.username,
@@ -50,6 +52,7 @@ class User(db.Model):
             "doctor_code": doc_code,
             "staff_id": self.staff_id,
             "staff_code": stf_code,
+            "must_change_password": bool(self.must_change_password),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -235,9 +238,15 @@ class Staff(db.Model):
     shift = db.Column(db.String(20))
 
     def to_dict(self):
-        dept_name = self.department_rel.name if self.department_rel else self.department
-        prefix = "NUR" if "nurse" in self.role.lower() else "STF"
+        role_str = (self.role or "").lower()
+        if "reception" in role_str:
+            prefix = "REC"
+        elif "nurse" in role_str:
+            prefix = "NUR"
+        else:
+            prefix = "STF"
         user = User.query.filter((User.staff_id == self.id) | (User.id == self.user_id)).first() if (self.id or self.user_id) else None
+        dept_name = self.department_rel.name if getattr(self, "department_rel", None) else self.department
         return {
             "id": self.id,
             "code": self.code or format_code(prefix, self.id),

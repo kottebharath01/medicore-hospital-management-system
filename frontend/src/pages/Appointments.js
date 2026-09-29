@@ -45,7 +45,9 @@ export default function Appointments() {
 
   const isPatient = currentUser?.role === 'patient';
   const isDoctor = currentUser?.role === 'doctor';
-  const isAdminOrDesk = currentUser?.role === 'admin' || currentUser?.role === 'receptionist';
+  const isReceptionist = currentUser?.role === 'receptionist';
+  const isAdmin = currentUser?.role === 'admin';
+  const canBook = isPatient || isReceptionist;
 
   // Booking Form State
   const [form, setForm] = useState({
@@ -142,11 +144,23 @@ export default function Appointments() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h2>{isPatient ? 'My Appointments' : isDoctor ? 'My Patient Consultations' : 'Appointments Management'}</h2>
+          <h2>
+            {isPatient
+              ? 'My Appointments'
+              : isDoctor
+              ? 'My Patient Consultations'
+              : isReceptionist
+              ? 'Front Desk Appointments & Scheduling'
+              : 'Appointments Monitoring & Reports'}
+          </h2>
           <p>
             {isPatient
               ? `Scheduled consultations for ${currentUser?.name || currentUser?.username} (${currentUser?.patient_code || 'PAT-0001'})`
-              : `${appts.length} appointments recorded`}
+              : isDoctor
+              ? `Clinical consultation appointments assigned to Dr. ${currentUser?.name || currentUser?.username}`
+              : isReceptionist
+              ? `${appts.length} appointments recorded • Front desk booking and consultation management`
+              : `${appts.length} appointments recorded • Hospital Administration Monitoring`}
           </p>
         </div>
 
@@ -164,22 +178,24 @@ export default function Appointments() {
             <option>Cancelled</option>
           </select>
 
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setForm({
-                patient_id: currentUser?.patient_id || '',
-                department_id: '',
-                doctor_id: '',
-                date: new Date().toISOString().split('T')[0],
-                time: '10:00',
-                notes: '',
-              });
-              setModal(true);
-            }}
-          >
-            <CalendarPlus size={15} /> {isPatient ? 'Book Appointment' : 'Schedule Appointment'}
-          </button>
+          {canBook && (
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setForm({
+                  patient_id: isPatient ? (currentUser?.patient_id || '') : '',
+                  department_id: '',
+                  doctor_id: '',
+                  date: new Date().toISOString().split('T')[0],
+                  time: '10:00',
+                  notes: '',
+                });
+                setModal(true);
+              }}
+            >
+              <CalendarPlus size={15} /> {isPatient ? 'Book Appointment' : 'Schedule Appointment'}
+            </button>
+          )}
         </div>
       </div>
 

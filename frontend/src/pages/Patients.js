@@ -43,6 +43,8 @@ export default function Patients() {
 
   const isNurse = currentUser?.role === 'nurse';
   const isAdmin = currentUser?.role === 'admin';
+  const isReceptionist = currentUser?.role === 'receptionist';
+  const isPatient = currentUser?.role === 'patient';
 
   const load = useCallback(() => {
     setLoading(true);
@@ -152,8 +154,16 @@ export default function Patients() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h2>Hospital Patients Directory</h2>
-          <p>{patients.length} registered patients in the database</p>
+          <h2>{isPatient ? 'My Patient Profile' : 'Hospital Patients Directory'}</h2>
+          <p>
+            {isPatient
+              ? `Personal health record for ${currentUser?.name || currentUser?.username} (${currentUser?.patient_code || 'PAT-0001'})`
+              : isAdmin
+              ? `${patients.length} registered patients • Administration Monitoring & Oversight`
+              : isReceptionist
+              ? `${patients.length} registered patients • Front Desk Patient Registration & Management`
+              : `${patients.length} registered patients in the database`}
+          </p>
         </div>
 
         <div className="flex gap-12">
@@ -166,9 +176,11 @@ export default function Patients() {
             />
           </div>
 
-          <button className="btn btn-primary" onClick={openAdd}>
-            <Plus size={15} /> Add Patient
-          </button>
+          {isReceptionist && (
+            <button className="btn btn-primary" onClick={openAdd}>
+              <Plus size={15} /> Register Patient
+            </button>
+          )}
         </div>
       </div>
 

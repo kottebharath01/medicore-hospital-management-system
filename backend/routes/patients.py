@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from database import db
 from models import Patient, Appointment, MedicalRecord, Bed, VitalSign, format_code
 from routes.auth import login_required, role_required
@@ -6,12 +6,38 @@ from routes.auth import login_required, role_required
 patients_bp = Blueprint("patients", __name__, url_prefix="/api/patients")
 
 
+def get_next_patient_code():
+    """Generate next sequential PAT-xxxx code."""
+    existing = [p.code for p in Patient.query.filter(Patient.code.like("PAT-%")).all() if p.code]
+    max_num = 0
+    for c in existing:
+        try:
+            num = int(c.split("-")[-1])
+            if num > max_num:
+                max_num = num
+        except (ValueError, IndexError):
+            pass
+    return format_code("PAT", max_num + 1)
+
+
 @patients_bp.route("", methods=["GET"])
 @login_required
 def get_patients():
-    """List patients with flexible search query on name, phone, email, or PAT-xxxx code."""
+    """
+    List patients with privacy-enforced filtering.
+    - Patient role: Exclusively restricted to their own record.
+    - Doctor, Nurse, Receptionist, Admin: Can view directory/search.
+    """
+    user = g.current_user
     q = request.args.get("q", "").strip()
     query = Patient.query
+
+    if user and user.role == "patient":
+        if user.patient_id:
+            query = query.filter_by(id=user.patient_id)
+        else:
+            return jsonify([]), 200
+
     if q:
         query = query.filter(
             (Patient.name.ilike(f"%{q}%"))
@@ -26,7 +52,11 @@ def get_patients():
 @patients_bp.route("/<int:pid>", methods=["GET"])
 @login_required
 def get_patient(pid):
-    """Retrieve complete patient profile including medical records, vitals, and admitted bed."""
+    """Retrieve complete patient profile with role-based privacy check."""
+    user = g.current_user
+    if user and user.role == "patient" and user.patient_id != pid:
+        return jsonify({"error": "Forbidden", "message": "You cannot access another patient's data"}), 403
+
     patient = Patient.query.get_or_404(pid)
     data = patient.to_dict()
 
@@ -58,11 +88,22 @@ def get_patient(pid):
 @patients_bp.route("", methods=["POST"])
 @login_required
 def create_patient():
-    """Register a new patient with unique business ID PAT-xxxx."""
+    """
+    Register a new walk-in patient (Receptionist ONLY).
+    STRICT ROLE RULE: Admin and other staff cannot operationally register patients.
+    Normal patients register via the public /register endpoint.
+    """
+    user = g.current_user
+    if not user or user.role != "receptionist":
+        return jsonify({
+            "error": "Forbidden",
+            "message": "Only Receptionists are authorized to operationally register walk-in patients. Admin cannot create operational patient records."
+        }), 403
+
     data = request.get_json() or {}
-    name = data.get("name", "").strip()
+    name = (data.get("name") or "").strip()
     age = data.get("age")
-    gender = data.get("gender", "Male").strip()
+    gender = (data.get("gender") or "Male").strip()
 
     if not name or age is None or not gender:
         return jsonify({"error": "Name, age, and gender are required"}), 400
@@ -72,8 +113,7 @@ def create_patient():
     except (ValueError, TypeError):
         return jsonify({"error": "Age must be a valid integer"}), 400
 
-    next_id = (db.session.query(db.func.max(Patient.id)).scalar() or 0) + 1
-    code = format_code("PAT", next_id)
+    code = get_next_patient_code()
 
     patient = Patient(
         code=code,
@@ -93,7 +133,18 @@ def create_patient():
 @patients_bp.route("/<int:pid>", methods=["PUT"])
 @login_required
 def update_patient(pid):
-    """Update existing patient details."""
+    """
+    Update patient details.
+    - Receptionist & Admin: Can update demographic details.
+    - Patient: Can update own contact details.
+    """
+    user = g.current_user
+    if user and user.role == "patient" and user.patient_id != pid:
+        return jsonify({"error": "Forbidden", "message": "You cannot modify another patient's data"}), 403
+
+    if user and user.role not in ("receptionist", "admin", "patient"):
+        return jsonify({"error": "Forbidden", "message": "You are not authorized to update patient records"}), 403
+
     patient = Patient.query.get_or_404(pid)
     data = request.get_json() or {}
 
