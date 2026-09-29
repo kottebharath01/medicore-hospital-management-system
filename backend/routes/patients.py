@@ -7,6 +7,7 @@ patients_bp = Blueprint("patients", __name__, url_prefix="/api/patients")
 
 
 @patients_bp.route("", methods=["GET"])
+@login_required
 def get_patients():
     """List patients with flexible search query on name, phone, email, or PAT-xxxx code."""
     q = request.args.get("q", "").strip()
@@ -23,6 +24,7 @@ def get_patients():
 
 
 @patients_bp.route("/<int:pid>", methods=["GET"])
+@login_required
 def get_patient(pid):
     """Retrieve complete patient profile including medical records, vitals, and admitted bed."""
     patient = Patient.query.get_or_404(pid)
@@ -54,6 +56,7 @@ def get_patient(pid):
 
 
 @patients_bp.route("", methods=["POST"])
+@login_required
 def create_patient():
     """Register a new patient with unique business ID PAT-xxxx."""
     data = request.get_json() or {}
@@ -88,6 +91,7 @@ def create_patient():
 
 
 @patients_bp.route("/<int:pid>", methods=["PUT"])
+@login_required
 def update_patient(pid):
     """Update existing patient details."""
     patient = Patient.query.get_or_404(pid)

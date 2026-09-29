@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, LogIn, LogOut, Shield, RefreshCw, KeyRound, UserPlus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { loginUser, registerUser, changePassword } from '../utils/api';
 import Modal from './Modal';
 import toast from 'react-hot-toast';
@@ -26,17 +27,11 @@ const DEMO_ROLES = [
 
 export default function Topbar() {
   const loc = useLocation();
+  const navigate = useNavigate();
+  const { user, login, logout } = useAuth();
+
   const [title, sub] = titles[loc.pathname] || ['MediCore', ''];
   const now = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
-
-  const [user, setUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem('user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
 
   const [loginModal, setLoginModal] = useState(false);
   const [regModal, setRegModal] = useState(false);
@@ -71,13 +66,10 @@ export default function Topbar() {
     setLoading(true);
     try {
       const res = await loginUser({ username: u, password: p });
-      const userData = res.data.user;
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      const { token, user: userData } = res.data;
+      login(token, userData);
       toast.success(`Welcome, ${userData.name || userData.username} (${userData.role})!`);
       setLoginModal(false);
-      window.location.reload(); // Refresh session across views
     } catch (err) {
       const msg = err.response?.data?.error || (err.response ? 'Invalid credentials' : 'Could not reach server.');
       toast.error(msg);
@@ -94,13 +86,10 @@ export default function Topbar() {
     setLoading(true);
     try {
       const res = await registerUser(regForm);
-      const userData = res.data.user;
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
+      const { token, user: userData } = res.data;
+      login(token, userData);
       toast.success(`Account registered! Your Patient ID is ${userData.patient_code || 'PAT-0001'}`);
       setRegModal(false);
-      window.location.reload();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Registration failed');
     } finally {
@@ -130,11 +119,9 @@ export default function Topbar() {
   }
 
   function handleLogout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+    logout();
     toast.success('Logged out successfully');
-    window.location.reload();
+    navigate('/login', { replace: true });
   }
 
   const initials = user ? (user.name || user.username).slice(0, 2).toUpperCase() : 'GU';

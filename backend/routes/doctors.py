@@ -7,6 +7,7 @@ doctors_bp = Blueprint("doctors", __name__, url_prefix="/api/doctors")
 
 
 @doctors_bp.route("", methods=["GET"])
+@login_required
 def get_doctors():
     """List doctors with optional search query on name, specialization, or department."""
     q = request.args.get("q", "").strip()
@@ -27,6 +28,7 @@ def get_doctors():
 
 
 @doctors_bp.route("/<int:did>", methods=["GET"])
+@login_required
 def get_doctor(did):
     """Retrieve doctor profile, consultation fee, and active appointments."""
     doctor = Doctor.query.get_or_404(did)
@@ -76,6 +78,8 @@ def create_doctor():
 
 
 @doctors_bp.route("/<int:did>", methods=["PUT"])
+@login_required
+@role_required("admin", "doctor")
 def update_doctor(did):
     """Update doctor details and consultation availability."""
     doctor = Doctor.query.get_or_404(did)

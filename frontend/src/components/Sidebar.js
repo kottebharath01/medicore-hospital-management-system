@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Users, Stethoscope, CalendarClock,
   FileText, BedDouble, UserCog, Building2, Activity, CalendarPlus
@@ -8,15 +9,7 @@ import {
 export default function Sidebar() {
   const loc = useLocation();
   const nav = useNavigate();
-
-  const user = (() => {
-    try {
-      const stored = localStorage.getItem('user');
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  })();
+  const { user } = useAuth();
 
   const role = user?.role || 'guest';
 

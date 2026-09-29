@@ -8,6 +8,7 @@ appointments_bp = Blueprint("appointments", __name__, url_prefix="/api/appointme
 
 
 @appointments_bp.route("", methods=["GET"])
+@login_required
 def get_appointments():
     """
     List appointments with role-based filtering and eager loading.
@@ -15,7 +16,7 @@ def get_appointments():
     - Doctor role: Automatically restricted to their own assigned appointments.
     - Admin/Receptionist: Access all appointments with optional filters.
     """
-    user = get_current_user_from_request()
+    user = g.current_user
     status = request.args.get("status", "").strip()
     doctor_id = request.args.get("doctor_id")
     patient_id = request.args.get("patient_id")
@@ -70,9 +71,10 @@ def get_my_appointments():
 
 
 @appointments_bp.route("/<int:aid>", methods=["GET"])
+@login_required
 def get_appointment(aid):
     """Retrieve single appointment by ID with role check."""
-    user = get_current_user_from_request()
+    user = g.current_user
     appt = Appointment.query.options(
         db.joinedload(Appointment.patient),
         db.joinedload(Appointment.doctor),
@@ -87,12 +89,13 @@ def get_appointment(aid):
 
 
 @appointments_bp.route("", methods=["POST"])
+@login_required
 def create_appointment():
     """
     Schedule an appointment.
     If authenticated as a Patient, patient_id is automatically obtained from the account.
     """
-    user = get_current_user_from_request()
+    user = g.current_user
     data = request.get_json() or {}
 
     # Auto-resolve patient_id for patient accounts
@@ -171,9 +174,10 @@ def create_appointment():
 
 
 @appointments_bp.route("/<int:aid>", methods=["PUT"])
+@login_required
 def update_appointment(aid):
     """Update appointment status (Scheduled, Confirmed, Completed, Cancelled) or details."""
-    user = get_current_user_from_request()
+    user = g.current_user
     appt = Appointment.query.get_or_404(aid)
 
     # Normal patient can only cancel their own appointment
@@ -204,9 +208,10 @@ def update_appointment(aid):
 
 
 @appointments_bp.route("/<int:aid>", methods=["DELETE"])
+@login_required
 def delete_appointment(aid):
     """Cancel and delete an appointment."""
-    user = get_current_user_from_request()
+    user = g.current_user
     appt = Appointment.query.get_or_404(aid)
 
     if user and user.role == "patient" and user.patient_id != appt.patient_id:

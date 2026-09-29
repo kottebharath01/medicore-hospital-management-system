@@ -7,6 +7,7 @@ departments_bp = Blueprint("departments", __name__, url_prefix="/api/departments
 
 
 @departments_bp.route("", methods=["GET"])
+@login_required
 def get_departments():
     """List all hospital clinical departments with dynamic doctor and staff counts."""
     depts = Department.query.order_by(Department.id.asc()).all()
@@ -14,6 +15,7 @@ def get_departments():
 
 
 @departments_bp.route("/<int:dept_id>", methods=["GET"])
+@login_required
 def get_department(dept_id):
     """Retrieve details for a single department."""
     dept = Department.query.get_or_404(dept_id)

@@ -7,6 +7,7 @@ vitals_bp = Blueprint("vitals", __name__, url_prefix="/api/vitals")
 
 
 @vitals_bp.route("", methods=["GET"])
+@login_required
 def get_vitals():
     """List vital signs with optional patient_id filter."""
     pid = request.args.get("patient_id")
@@ -18,6 +19,8 @@ def get_vitals():
 
 
 @vitals_bp.route("", methods=["POST"])
+@login_required
+@role_required("admin", "doctor", "nurse")
 def record_vitals():
     """Record patient vital signs and nursing observation."""
     data = request.get_json() or {}

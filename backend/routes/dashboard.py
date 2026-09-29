@@ -2,11 +2,13 @@ from datetime import date
 from flask import Blueprint, jsonify
 from database import db
 from models import Patient, Doctor, Appointment, Ward, Bed, Staff, Department
+from routes.auth import login_required
 
 dashboard_bp = Blueprint("dashboard", __name__, url_prefix="/api/dashboard")
 
 
 @dashboard_bp.route("", methods=["GET"])
+@login_required
 def get_dashboard():
     """
     Get aggregated hospital overview statistics and recent appointments.
@@ -71,6 +73,7 @@ def get_dashboard():
 
 
 @dashboard_bp.route("/bed-occupancy", methods=["GET"])
+@login_required
 def get_bed_occupancy():
     """
     Return detailed live occupancy list for all currently occupied hospital beds.

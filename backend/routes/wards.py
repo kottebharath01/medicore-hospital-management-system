@@ -7,6 +7,7 @@ wards_bp = Blueprint("wards", __name__, url_prefix="/api/wards")
 
 
 @wards_bp.route("", methods=["GET"])
+@login_required
 def get_wards():
     """List all hospital wards with dynamic bed capacity, occupied, and available metrics."""
     wards = Ward.query.order_by(Ward.id.asc()).all()
@@ -14,6 +15,7 @@ def get_wards():
 
 
 @wards_bp.route("/<int:wid>", methods=["GET"])
+@login_required
 def get_ward(wid):
     """Retrieve single ward with dynamic bed breakdown."""
     ward = Ward.query.get_or_404(wid)
@@ -29,6 +31,7 @@ def get_ward(wid):
 
 
 @wards_bp.route("/<int:wid>/beds", methods=["GET"])
+@login_required
 def get_ward_beds(wid):
     """Retrieve all beds and patient assignments for a specific ward."""
     beds = (
@@ -41,6 +44,8 @@ def get_ward_beds(wid):
 
 
 @wards_bp.route("", methods=["POST"])
+@login_required
+@role_required("admin")
 def create_ward():
     """Create a new hospital ward with WRD-xxxx code."""
     data = request.get_json() or {}
@@ -66,6 +71,8 @@ def create_ward():
 
 
 @wards_bp.route("/<int:wid>", methods=["PUT"])
+@login_required
+@role_required("admin")
 def update_ward(wid):
     """Update ward details."""
     ward = Ward.query.get_or_404(wid)
@@ -83,6 +90,8 @@ def update_ward(wid):
 
 
 @wards_bp.route("/<int:wid>", methods=["DELETE"])
+@login_required
+@role_required("admin")
 def delete_ward(wid):
     """Delete ward and cascade delete all its beds."""
     ward = Ward.query.get_or_404(wid)
@@ -94,6 +103,7 @@ def delete_ward(wid):
 # ─── Individual Bed Management Endpoints ────────────────────────────────────────
 
 @wards_bp.route("/beds", methods=["GET"])
+@login_required
 def get_all_beds():
     """List all beds across the hospital with optional status or ward_id filter."""
     ward_id = request.args.get("ward_id")
@@ -115,6 +125,8 @@ def get_all_beds():
 
 
 @wards_bp.route("/beds", methods=["POST"])
+@login_required
+@role_required("admin", "nurse", "receptionist")
 def create_bed():
     """Add a new bed to a ward."""
     data = request.get_json() or {}
@@ -142,6 +154,8 @@ def create_bed():
 
 
 @wards_bp.route("/beds/<int:bid>", methods=["PUT"])
+@login_required
+@role_required("admin", "nurse", "receptionist")
 def update_bed(bid):
     """
     Update bed status and patient allocation.
@@ -184,6 +198,8 @@ def update_bed(bid):
 
 
 @wards_bp.route("/beds/<int:bid>", methods=["DELETE"])
+@login_required
+@role_required("admin")
 def delete_bed(bid):
     """Delete bed."""
     bed = Bed.query.get_or_404(bid)

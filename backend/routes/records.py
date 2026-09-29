@@ -1,13 +1,14 @@
 from datetime import datetime, date
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from database import db
 from models import MedicalRecord, Patient, Doctor, format_code
-from routes.auth import get_current_user_from_request, login_required, role_required
+from routes.auth import login_required, role_required
 
 records_bp = Blueprint("records", __name__, url_prefix="/api/records")
 
 
 @records_bp.route("", methods=["GET"])
+@login_required
 def get_records():
     """
     List clinical medical records with role-based privacy protection.
@@ -15,7 +16,7 @@ def get_records():
     - Doctor role: Automatically pre-filters to their patients or allows search.
     - Admin: Full view.
     """
-    user = get_current_user_from_request()
+    user = g.current_user
     pid = request.args.get("patient_id")
     did = request.args.get("doctor_id")
 
@@ -43,9 +44,10 @@ def get_records():
 
 
 @records_bp.route("/<int:rid>", methods=["GET"])
+@login_required
 def get_record(rid):
     """Retrieve single medical record by ID with role authorization."""
-    user = get_current_user_from_request()
+    user = g.current_user
     rec = MedicalRecord.query.options(
         db.joinedload(MedicalRecord.patient),
         db.joinedload(MedicalRecord.doctor),
@@ -58,10 +60,12 @@ def get_record(rid):
 
 
 @records_bp.route("", methods=["POST"])
+@login_required
+@role_required("admin", "doctor", "nurse")
 def create_record():
     """Create a new clinical medical record with diagnosis, prescription, treatment, and medicines."""
     data = request.get_json() or {}
-    user = get_current_user_from_request()
+    user = g.current_user
 
     patient_id = data.get("patient_id")
     doctor_id = user.doctor_id if (user and user.role == "doctor") else data.get("doctor_id")

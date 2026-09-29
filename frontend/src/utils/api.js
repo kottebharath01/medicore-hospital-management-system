@@ -13,12 +13,33 @@ const API = axios.create({
 
 // Attach JWT token to requests if available
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("token") || localStorage.getItem("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete config.headers.Authorization;
   }
   return config;
 });
+
+// Intercept 401 Unauthorized responses and invalidate auth state
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user");
+      try {
+        sessionStorage.clear();
+      } catch {}
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.replace("/login");
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Authentication & Users
 export const loginUser = (credentials) => API.post("/auth/login", credentials);

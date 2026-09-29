@@ -7,6 +7,7 @@ staff_bp = Blueprint("staff", __name__, url_prefix="/api/staff")
 
 
 @staff_bp.route("", methods=["GET"])
+@login_required
 def get_staff():
     """List staff members with optional department filter."""
     dept_id = request.args.get("department_id")
@@ -18,6 +19,7 @@ def get_staff():
 
 
 @staff_bp.route("/<int:sid>", methods=["GET"])
+@login_required
 def get_single_staff(sid):
     """Retrieve single staff member by ID."""
     staff = Staff.query.get_or_404(sid)
@@ -25,6 +27,8 @@ def get_single_staff(sid):
 
 
 @staff_bp.route("", methods=["POST"])
+@login_required
+@role_required("admin")
 def create_staff():
     """Register a new staff member with STF-xxxx or NUR-xxxx code."""
     data = request.get_json() or {}
@@ -54,6 +58,8 @@ def create_staff():
 
 
 @staff_bp.route("/<int:sid>", methods=["PUT"])
+@login_required
+@role_required("admin")
 def update_staff(sid):
     """Update existing staff member details."""
     staff = Staff.query.get_or_404(sid)
