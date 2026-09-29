@@ -74,6 +74,7 @@ export const getDoctor = (id) => API.get(`/doctors/${id}`);
 export const createDoctor = (data) => API.post("/doctors", data);
 export const updateDoctor = (id, data) => API.put(`/doctors/${id}`, data);
 export const deleteDoctor = (id) => API.delete(`/doctors/${id}`);
+export const resetDoctorPassword = (id, data) => API.post(`/doctors/${id}/reset-password`, data);
 
 // Appointments
 export const getAppointments = (status = "", doctorId = "") =>
@@ -112,5 +113,6 @@ export const getStaff = () => API.get("/staff");
 export const createStaff = (data) => API.post("/staff", data);
 export const updateStaff = (id, data) => API.put(`/staff/${id}`, data);
 export const deleteStaff = (id) => API.delete(`/staff/${id}`);
+export const resetStaffPassword = (id, data) => API.post(`/staff/${id}/reset-password`, data);
 
 export default API;

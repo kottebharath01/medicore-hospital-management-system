@@ -1,7 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getDoctors, createDoctor, updateDoctor, deleteDoctor, getDepartments } from '../utils/api';
+import {
+  getDoctors,
+  createDoctor,
+  updateDoctor,
+  deleteDoctor,
+  resetDoctorPassword,
+  getDepartments,
+} from '../utils/api';
 import Modal from '../components/Modal';
-import { Search, Plus, Pencil, Trash2, Stethoscope, CheckCircle2, XCircle } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Pencil,
+  Trash2,
+  Stethoscope,
+  CheckCircle2,
+  XCircle,
+  KeyRound,
+  ShieldCheck,
+  UserCheck,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SPECIALIZATIONS = [
@@ -24,6 +42,9 @@ const SPECIALIZATIONS = [
 
 const EMPTY = {
   name: '',
+  username: '',
+  password: '',
+  confirm_password: '',
   specialization: 'Cardiology',
   department_id: '',
   phone: '',
@@ -43,6 +64,15 @@ export default function Doctors() {
   const [form, setForm] = useState(EMPTY);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // Success summary modal after new account creation
+  const [createdSummary, setCreatedSummary] = useState(null);
+
+  // Admin password reset modal
+  const [resetModal, setResetModal] = useState(false);
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetForm, setResetForm] = useState({ new_password: '', confirm_password: '' });
+  const [resetting, setResetting] = useState(false);
 
   const currentUser = (() => {
     try {
@@ -87,6 +117,9 @@ export default function Doctors() {
   function openEdit(d) {
     setForm({
       name: d.name,
+      username: d.username || '',
+      password: '',
+      confirm_password: '',
       specialization: d.specialization || 'Cardiology',
       department_id: d.department_id ? String(d.department_id) : '',
       phone: d.phone || '',
@@ -99,6 +132,12 @@ export default function Doctors() {
     setModal(true);
   }
 
+  function openResetPassword(d) {
+    setResetTarget(d);
+    setResetForm({ new_password: '', confirm_password: '' });
+    setResetModal(true);
+  }
+
   function setField(k, v) {
     setForm((f) => ({ ...f, [k]: v }));
   }
@@ -107,28 +146,82 @@ export default function Doctors() {
     if (!form.name.trim()) return toast.error('Doctor name is required');
     if (!form.specialization) return toast.error('Specialization is required');
 
+    // Validation for new doctor registration
+    if (!editing) {
+      if (!form.username.trim()) {
+        return toast.error('Username is required for the doctor login account');
+      }
+      if (form.username.trim().length < 3) {
+        return toast.error('Username must be at least 3 characters long');
+      }
+      if (!form.password) {
+        return toast.error('Initial password is required');
+      }
+      if (form.password.length < 6) {
+        return toast.error('Password must be at least 6 characters long');
+      }
+      if (form.password !== form.confirm_password) {
+        return toast.error('Password and confirm password do not match');
+      }
+    }
+
     setSaving(true);
     try {
       const payload = {
-        ...form,
+        name: form.name.trim(),
+        username: form.username.trim(),
+        password: form.password,
+        confirm_password: form.confirm_password,
+        specialization: form.specialization,
         department_id: form.department_id ? parseInt(form.department_id, 10) : null,
+        phone: form.phone.trim(),
+        email: form.email.trim(),
         experience: form.experience ? parseInt(form.experience, 10) : 0,
         fee: form.fee ? parseFloat(form.fee) : 500.0,
+        available: Boolean(form.available),
       };
 
       if (editing) {
         await updateDoctor(editing, payload);
         toast.success('Doctor details updated');
+        setModal(false);
       } else {
-        await createDoctor(payload);
-        toast.success('Doctor registered successfully');
+        const res = await createDoctor(payload);
+        toast.success('Doctor and login account created successfully');
+        setModal(false);
+        // Display credentials confirmation modal
+        if (res.data?.credentials) {
+          setCreatedSummary(res.data.credentials);
+        }
       }
       load();
-      setModal(false);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error saving doctor');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!resetForm.new_password) {
+      return toast.error('New password is required');
+    }
+    if (resetForm.new_password.length < 6) {
+      return toast.error('New password must be at least 6 characters long');
+    }
+    if (resetForm.new_password !== resetForm.confirm_password) {
+      return toast.error('Passwords do not match');
+    }
+
+    setResetting(true);
+    try {
+      const res = await resetDoctorPassword(resetTarget.id, resetForm);
+      toast.success(res.data?.message || 'Password reset successfully');
+      setResetModal(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reset password');
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -144,10 +237,10 @@ export default function Doctors() {
   }
 
   async function del(d) {
-    if (!window.confirm(`Are you sure you want to remove Dr. ${d.name}?`)) return;
+    if (!window.confirm(`Are you sure you want to remove Dr. ${d.name} and delete their login account?`)) return;
     try {
       await deleteDoctor(d.id);
-      toast.success('Doctor removed');
+      toast.success('Doctor account removed successfully');
       load();
     } catch {
       toast.error('Failed to remove doctor');
@@ -212,6 +305,7 @@ export default function Doctors() {
                 <tr>
                   <th>Doctor ID</th>
                   <th>Doctor Name</th>
+                  <th>Username</th>
                   <th>Department / Specialization</th>
                   <th>Experience</th>
                   <th>Consultation Fee</th>
@@ -227,7 +321,18 @@ export default function Doctors() {
                       <span className="badge badge-blue">{d.code || `DOC-${String(d.id).padStart(4, '0')}`}</span>
                     </td>
                     <td>
-                      <span className="fw-600">Dr. {d.name}</span>
+                      <span className="fw-600">
+                        {d.name?.toLowerCase().startsWith('dr.') ? d.name : `Dr. ${d.name}`}
+                      </span>
+                    </td>
+                    <td>
+                      {d.username ? (
+                        <span className="badge badge-scheduled" style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                          @{d.username}
+                        </span>
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>—</span>
+                      )}
                     </td>
                     <td>
                       <div>
@@ -273,6 +378,14 @@ export default function Doctors() {
                           <button className="btn-icon" title="Edit Doctor" onClick={() => openEdit(d)}>
                             <Pencil size={14} />
                           </button>
+                          <button
+                            className="btn-icon"
+                            title="Reset Doctor Login Password"
+                            style={{ color: 'var(--primary)' }}
+                            onClick={() => openResetPassword(d)}
+                          >
+                            <KeyRound size={14} />
+                          </button>
                           <button className="btn-icon danger" title="Remove Doctor" onClick={() => del(d)}>
                             <Trash2 size={14} />
                           </button>
@@ -287,9 +400,10 @@ export default function Doctors() {
         </div>
       </div>
 
+      {/* Add / Edit Doctor Modal */}
       {modal && (
         <Modal
-          title={editing ? 'Edit Doctor Profile' : 'Register New Doctor'}
+          title={editing ? 'Edit Doctor Profile' : 'Register Doctor & Create Account'}
           onClose={() => setModal(false)}
           footer={
             <>
@@ -297,20 +411,95 @@ export default function Doctors() {
                 Cancel
               </button>
               <button className="btn btn-primary" onClick={save} disabled={saving}>
-                {saving ? 'Saving…' : editing ? 'Update Doctor' : 'Register Doctor'}
+                {saving ? 'Saving…' : editing ? 'Update Doctor' : 'Create Doctor Account'}
               </button>
             </>
           }
         >
           <div className="form-grid">
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <div
+                style={{
+                  background: 'var(--primary-light, #eef4f9)',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: '0.84rem',
+                  color: 'var(--primary, #0f4c81)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <ShieldCheck size={18} />
+                <span>
+                  Admin enters the Doctor's <strong>Username</strong> and <strong>Initial Password</strong>.
+                  The system automatically assigns the unique <strong>Doctor ID (DOC-xxxx)</strong>.
+                </span>
+              </div>
+            </div>
+
             <div className="form-group">
               <label className="form-label">Doctor Full Name *</label>
               <input
                 className="form-control"
                 value={form.name}
                 onChange={(e) => setField('name', e.target.value)}
-                placeholder="e.g. Sarah Jenkins"
+                placeholder="e.g. Dr. Ravi Kumar"
               />
+            </div>
+
+            {!editing && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Username * (For Staff Login)</label>
+                  <input
+                    className="form-control"
+                    value={form.username}
+                    onChange={(e) => setField('username', e.target.value)}
+                    placeholder="e.g. Doctor_ravi"
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Initial Password *</label>
+                  <input
+                    className="form-control"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setField('password', e.target.value)}
+                    placeholder="At least 6 characters"
+                    autoComplete="new-password"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Confirm Password *</label>
+                  <input
+                    className="form-control"
+                    type="password"
+                    value={form.confirm_password}
+                    onChange={(e) => setField('confirm_password', e.target.value)}
+                    placeholder="Repeat initial password"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Clinical Specialization *</label>
+              <select
+                className="form-control"
+                value={form.specialization}
+                onChange={(e) => setField('specialization', e.target.value)}
+              >
+                {SPECIALIZATIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
@@ -324,21 +513,6 @@ export default function Doctors() {
                 {departments.map((dep) => (
                   <option key={dep.id} value={dep.id}>
                     {dep.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Clinical Specialization *</label>
-              <select
-                className="form-control"
-                value={form.specialization}
-                onChange={(e) => setField('specialization', e.target.value)}
-              >
-                {SPECIALIZATIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
                   </option>
                 ))}
               </select>
@@ -385,7 +559,7 @@ export default function Doctors() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setField('email', e.target.value)}
-                placeholder="doctor@hospital.com"
+                placeholder="doctor@hospital.com (Optional)"
               />
             </div>
 
@@ -401,6 +575,137 @@ export default function Doctors() {
                   Available for Consultations
                 </span>
               </label>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Admin Reset Password Modal */}
+      {resetModal && resetTarget && (
+        <Modal
+          title={`Reset Password for Dr. ${resetTarget.name}`}
+          onClose={() => setResetModal(false)}
+          footer={
+            <>
+              <button className="btn btn-outline" onClick={() => setResetModal(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleResetPassword} disabled={resetting}>
+                {resetting ? 'Resetting…' : 'Update Password'}
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: 8, fontSize: '0.88rem' }}>
+              <div><strong>Doctor:</strong> Dr. {resetTarget.name}</div>
+              <div><strong>Staff ID:</strong> {resetTarget.code || `DOC-${resetTarget.id}`}</div>
+              {resetTarget.username && <div><strong>Username:</strong> @{resetTarget.username}</div>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">New Password *</label>
+              <input
+                className="form-control"
+                type="password"
+                value={resetForm.new_password}
+                onChange={(e) => setResetForm((f) => ({ ...f, new_password: e.target.value }))}
+                placeholder="Enter at least 6 characters"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Confirm New Password *</label>
+              <input
+                className="form-control"
+                type="password"
+                value={resetForm.confirm_password}
+                onChange={(e) => setResetForm((f) => ({ ...f, confirm_password: e.target.value }))}
+                placeholder="Re-enter new password"
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Account Created Success Confirmation Modal */}
+      {createdSummary && (
+        <Modal
+          title="Doctor Account Created Successfully"
+          onClose={() => setCreatedSummary(null)}
+          footer={
+            <button className="btn btn-primary" onClick={() => setCreatedSummary(null)}>
+              Done
+            </button>
+          }
+        >
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: '#e6f7f5',
+                color: '#00a99d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto',
+              }}
+            >
+              <UserCheck size={28} />
+            </div>
+
+            <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>Staff Profile & Login Ready</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', margin: '0 0 20px 0' }}>
+              The doctor's profile and authentication account were created in the database.
+            </p>
+
+            <div
+              style={{
+                background: '#f8fafc',
+                border: '1px solid var(--border-color)',
+                borderRadius: 10,
+                padding: '16px 20px',
+                textAlign: 'left',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                fontSize: '0.9rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="text-muted">Doctor Name:</span>
+                <strong>{createdSummary.name?.toLowerCase().startsWith('dr.') ? createdSummary.name : `Dr. ${createdSummary.name}`}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="text-muted">Doctor ID:</span>
+                <span className="badge badge-blue">{createdSummary.code}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="text-muted">Assigned Username:</span>
+                <span className="badge badge-scheduled">@{createdSummary.username}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span className="text-muted">System Role:</span>
+                <span className="badge badge-available">Doctor</span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 18,
+                background: '#f0fdf4',
+                color: '#166534',
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                textAlign: 'left',
+              }}
+            >
+              The doctor can now sign in at the login screen using their <strong>Username</strong> and the initial password set by Admin.
             </div>
           </div>
         </Modal>

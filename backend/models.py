@@ -20,10 +20,12 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="patient")  # admin, doctor, nurse, receptionist, patient
     patient_id = db.Column(db.Integer, db.ForeignKey("patients.id", ondelete="SET NULL"), nullable=True)
     doctor_id = db.Column(db.Integer, db.ForeignKey("doctors.id", ondelete="SET NULL"), nullable=True)
+    staff_id = db.Column(db.Integer, db.ForeignKey("staff.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     patient = db.relationship("Patient", foreign_keys=[patient_id], uselist=False)
     doctor = db.relationship("Doctor", foreign_keys=[doctor_id], uselist=False)
+    staff = db.relationship("Staff", foreign_keys=[staff_id], uselist=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -34,17 +36,20 @@ class User(db.Model):
     def to_dict(self):
         pat_code = self.patient.code if self.patient else (format_code("PAT", self.patient_id) if self.patient_id else None)
         doc_code = self.doctor.code if self.doctor else (format_code("DOC", self.doctor_id) if self.doctor_id else None)
+        stf_code = self.staff.code if self.staff else (format_code("STF", self.staff_id) if self.staff_id else None)
         return {
             "id": self.id,
             "username": self.username,
             "name": self.name or self.username,
             "email": self.email,
             "role": self.role,
-            "code": pat_code or doc_code,
+            "code": pat_code or doc_code or stf_code,
             "patient_id": self.patient_id,
             "patient_code": pat_code,
             "doctor_id": self.doctor_id,
             "doctor_code": doc_code,
+            "staff_id": self.staff_id,
+            "staff_code": stf_code,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -113,6 +118,7 @@ class Doctor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(20), unique=True, index=True)
     department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True)
+    user_id = db.Column(db.Integer, nullable=True)
     name = db.Column(db.String(100), nullable=False, index=True)
     specialization = db.Column(db.String(100), nullable=False, index=True)
     phone = db.Column(db.String(15))
@@ -123,10 +129,13 @@ class Doctor(db.Model):
 
     def to_dict(self):
         dept_name = self.department_rel.name if self.department_rel else self.specialization
+        user = User.query.filter((User.doctor_id == self.id) | (User.id == self.user_id)).first() if (self.id or self.user_id) else None
         return {
             "id": self.id,
             "code": self.code or format_code("DOC", self.id),
             "name": self.name,
+            "username": user.username if user else None,
+            "user_id": user.id if user else self.user_id,
             "specialization": self.specialization,
             "department_id": self.department_id,
             "department_name": dept_name,
@@ -217,6 +226,7 @@ class Staff(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(20), unique=True, index=True)
     department_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True)
+    user_id = db.Column(db.Integer, nullable=True)
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(50), nullable=False)  # Head Nurse, Nurse, Lab Technician, Pharmacist, Receptionist
     department = db.Column(db.String(100))
@@ -227,10 +237,13 @@ class Staff(db.Model):
     def to_dict(self):
         dept_name = self.department_rel.name if self.department_rel else self.department
         prefix = "NUR" if "nurse" in self.role.lower() else "STF"
+        user = User.query.filter((User.staff_id == self.id) | (User.id == self.user_id)).first() if (self.id or self.user_id) else None
         return {
             "id": self.id,
             "code": self.code or format_code(prefix, self.id),
             "name": self.name,
+            "username": user.username if user else None,
+            "user_id": user.id if user else self.user_id,
             "role": self.role,
             "department_id": self.department_id,
             "department": dept_name,

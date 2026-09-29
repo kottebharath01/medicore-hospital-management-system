@@ -8,8 +8,10 @@ def run_migrations():
     statements = [
         "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS code VARCHAR(20);",
         "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS department_id INTEGER;",
+        "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS user_id INTEGER;",
         "ALTER TABLE staff ADD COLUMN IF NOT EXISTS code VARCHAR(20);",
         "ALTER TABLE staff ADD COLUMN IF NOT EXISTS department_id INTEGER;",
+        "ALTER TABLE staff ADD COLUMN IF NOT EXISTS user_id INTEGER;",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS code VARCHAR(20);",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS user_id INTEGER;",
         "ALTER TABLE wards ADD COLUMN IF NOT EXISTS code VARCHAR(20);",
@@ -21,6 +23,7 @@ def run_migrations():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(100);",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS doctor_id INTEGER;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS patient_id INTEGER;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS staff_id INTEGER;",
     ]
     for stmt in statements:
         try:
@@ -298,6 +301,8 @@ def seed_database():
     # 10. Role-based User Accounts
     p1 = Patient.query.filter_by(name="Rahul Gupta").first()
     d1 = Doctor.query.filter_by(name="Dr. Priya Sharma").first()
+    s_nurse = Staff.query.filter_by(name="Kavitha Nair").first()
+    s_receptionist = Staff.query.filter_by(name="Sunil Mehta").first()
 
     demo_accounts = [
         {
@@ -308,6 +313,7 @@ def seed_database():
             "password": "admin123",
             "patient_id": None,
             "doctor_id": None,
+            "staff_id": None,
         },
         {
             "username": "doctor",
@@ -317,6 +323,7 @@ def seed_database():
             "password": "doctor123",
             "patient_id": None,
             "doctor_id": d1.id if d1 else 1,
+            "staff_id": None,
         },
         {
             "username": "nurse",
@@ -326,6 +333,7 @@ def seed_database():
             "password": "nurse123",
             "patient_id": None,
             "doctor_id": None,
+            "staff_id": s_nurse.id if s_nurse else 1,
         },
         {
             "username": "receptionist",
@@ -335,6 +343,7 @@ def seed_database():
             "password": "receptionist123",
             "patient_id": None,
             "doctor_id": None,
+            "staff_id": s_receptionist.id if s_receptionist else 4,
         },
         {
             "username": "patient",
@@ -344,6 +353,7 @@ def seed_database():
             "password": "patient123",
             "patient_id": p1.id if p1 else 1,
             "doctor_id": None,
+            "staff_id": None,
         },
         {
             "username": "user",
@@ -353,6 +363,7 @@ def seed_database():
             "password": "user123",
             "patient_id": p1.id if p1 else 1,
             "doctor_id": None,
+            "staff_id": None,
         },
     ]
 
@@ -366,14 +377,25 @@ def seed_database():
                 role=acc["role"],
                 patient_id=acc["patient_id"],
                 doctor_id=acc["doctor_id"],
+                staff_id=acc["staff_id"],
             )
             u.set_password(acc["password"])
             db.session.add(u)
+            db.session.flush()
         else:
             u.name = acc["name"]
             u.role = acc["role"]
             u.patient_id = acc["patient_id"]
             u.doctor_id = acc["doctor_id"]
+            u.staff_id = acc["staff_id"]
             u.set_password(acc["password"])
+            db.session.flush()
+
+        if acc["role"] == "doctor" and d1:
+            d1.user_id = u.id
+        elif acc["role"] == "nurse" and s_nurse:
+            s_nurse.user_id = u.id
+        elif acc["role"] == "receptionist" and s_receptionist:
+            s_receptionist.user_id = u.id
 
     db.session.commit()

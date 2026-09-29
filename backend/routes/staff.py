@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from database import db
-from models import Staff, format_code
+from models import Staff, User, format_code
 from routes.auth import login_required, role_required
 
 staff_bp = Blueprint("staff", __name__, url_prefix="/api/staff")
@@ -30,31 +30,140 @@ def get_single_staff(sid):
 @login_required
 @role_required("admin")
 def create_staff():
-    """Register a new staff member with STF-xxxx or NUR-xxxx code."""
+    """
+    Register a new staff member with auto-generated NUR-xxxx or STF-xxxx code
+    and linked User authentication account (Admin only).
+    Admin manually provides: Staff Name, Username, Initial Password, Role.
+    System automatically generates: Unique Staff/Nurse ID.
+    """
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
     role = (data.get("role") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = (data.get("password") or "").strip()
+    confirm_password = (data.get("confirm_password") or "").strip()
+    email = (data.get("email") or "").strip().lower()
 
     if not name or not role:
         return jsonify({"error": "Staff name and role are required"}), 400
 
+    if not username or not password:
+        return jsonify({"error": "Username and initial password are required to create a staff account"}), 400
+
+    if len(username) < 3:
+        return jsonify({"error": "Username must be at least 3 characters long"}), 400
+
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters long"}), 400
+
+    if confirm_password and password != confirm_password:
+        return jsonify({"error": "Password and confirmation do not match"}), 400
+
+    # Strict username uniqueness check across the entire users table
+    if User.query.filter_by(username=username).first():
+        return jsonify({"error": "Username already exists. Please choose another username."}), 409
+
+    # Determine role for user account
+    role_lower = role.lower()
+    if "nurse" in role_lower:
+        user_role = "nurse"
+    elif "reception" in role_lower:
+        user_role = "receptionist"
+    else:
+        user_role = "nurse"
+
+    # Auto-generate staff code: NUR-xxxx for nurses, STF-xxxx for other staff
     next_id = (db.session.query(db.func.max(Staff.id)).scalar() or 0) + 1
-    prefix = "NUR" if "nurse" in role.lower() else "STF"
+    prefix = "NUR" if "nurse" in role_lower else "STF"
     code = format_code(prefix, next_id)
 
-    staff = Staff(
-        code=code,
-        name=name,
-        role=role,
-        department_id=data.get("department_id"),
-        department=data.get("department"),
-        phone=data.get("phone"),
-        email=data.get("email"),
-        shift=data.get("shift", "Morning"),
-    )
-    db.session.add(staff)
+    # Validate or generate email
+    if not email:
+        email = f"{username.lower()}@hospital.com"
+        if User.query.filter_by(email=email).first():
+            email = f"{username.lower()}{next_id}@hospital.com"
+    else:
+        if User.query.filter_by(email=email).first():
+            return jsonify({"error": "Email is already registered. Please provide a different email address."}), 409
+
+    # Atomic creation of both Staff profile and User login account
+    try:
+        staff = Staff(
+            code=code,
+            name=name,
+            role=role,
+            department_id=data.get("department_id"),
+            department=data.get("department"),
+            phone=data.get("phone"),
+            email=email,
+            shift=data.get("shift", "Morning"),
+        )
+        db.session.add(staff)
+        db.session.flush()
+
+        user = User(
+            username=username,
+            name=name,
+            email=email,
+            role=user_role,
+            staff_id=staff.id,
+        )
+        user.set_password(password)
+        db.session.add(user)
+        db.session.flush()
+
+        staff.user_id = user.id
+        db.session.commit()
+
+        return jsonify({
+            "message": f"Staff profile and credentials created successfully for {staff.name}.",
+            "staff": staff.to_dict(),
+            "credentials": {
+                "name": staff.name,
+                "code": staff.code,
+                "username": user.username,
+                "role": user_role
+            }
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to create staff account", "details": str(e)}), 500
+
+
+@staff_bp.route("/<int:sid>/reset-password", methods=["POST"])
+@login_required
+@role_required("admin")
+def reset_staff_password(sid):
+    """
+    Admin-only endpoint to reset the login password for a Staff member.
+    Validates new password, hashes with bcrypt, and updates User account.
+    """
+    staff = Staff.query.get_or_404(sid)
+    user = User.query.filter((User.staff_id == sid) | (User.id == staff.user_id)).first()
+
+    if not user:
+        return jsonify({"error": f"No user login account found for {staff.name}"}), 404
+
+    data = request.get_json() or {}
+    new_password = (data.get("new_password") or data.get("password") or "").strip()
+    confirm_password = (data.get("confirm_password") or "").strip()
+
+    if not new_password:
+        return jsonify({"error": "New password is required"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters long"}), 400
+
+    if confirm_password and new_password != confirm_password:
+        return jsonify({"error": "New password and confirmation do not match"}), 400
+
+    user.set_password(new_password)
     db.session.commit()
-    return jsonify(staff.to_dict()), 201
+
+    return jsonify({
+        "message": f"Password for {staff.name} ({user.username}) has been successfully reset."
+    }), 200
 
 
 @staff_bp.route("/<int:sid>", methods=["PUT"])
@@ -69,6 +178,13 @@ def update_staff(sid):
         if key in data and data[key] is not None:
             setattr(staff, key, data[key])
 
+    # Also update linked user's name/email if changed
+    user = User.query.filter((User.staff_id == sid) | (User.id == staff.user_id)).first()
+    if user:
+        user.name = staff.name
+        if staff.email:
+            user.email = staff.email
+
     db.session.commit()
     return jsonify(staff.to_dict()), 200
 
@@ -77,8 +193,11 @@ def update_staff(sid):
 @login_required
 @role_required("admin")
 def delete_staff(sid):
-    """Delete staff member (Admin only)."""
+    """Delete staff member and associated login credentials (Admin only)."""
     staff = Staff.query.get_or_404(sid)
+    user = User.query.filter((User.staff_id == sid) | (User.id == staff.user_id)).first()
+    if user:
+        db.session.delete(user)
     db.session.delete(staff)
     db.session.commit()
-    return jsonify({"message": f"Staff member {staff.name} deleted successfully"}), 200
+    return jsonify({"message": f"Staff member {staff.name} and associated credentials removed successfully"}), 200
