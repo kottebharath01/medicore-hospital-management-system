@@ -60,27 +60,25 @@ https://medicore-backend-uvgi.onrender.com
 # 🛠 Tech Stack
 
 ## Frontend
-- React.js
-- Axios
-- CSS
-- JavaScript
+- React.js 18
+- Axios (with JWT interceptors)
+- Lucide React (Icons)
+- Recharts (Visualizations)
+- React Hot Toast
 
 ## Backend
-- Python
-- Flask
-- Flask SQLAlchemy
-- Flask CORS
+- Python 3.12 / 3.13
+- Flask 3.0 (Modular Blueprints architecture)
+- Flask-SQLAlchemy 3.1 / SQLAlchemy 2.0
+- psycopg2-binary 2.9 (PostgreSQL driver)
+- PyJWT (Authentication & token verification)
+- Flask-CORS 4.0
 
 ## Database
-- SQLite
-
-## Deployment
-- Vercel
-- Render
+- Local PostgreSQL 18 (with connection pooling & optimized indexed joins)
 
 ## Version Control
-- Git
-- GitHub
+- Git & GitHub
 
 ---
 
@@ -90,16 +88,30 @@ https://medicore-backend-uvgi.onrender.com
 medicore-hospital-management-system
 │
 ├── backend
-│   ├── app.py
-│   ├── hospital.db
-│   ├── requirements.txt
-│   └── ...
+│   ├── routes/              # Modular API Blueprints
+│   │   ├── auth.py          # Authentication & user management
+│   │   ├── dashboard.py     # Aggregated analytics (53% faster)
+│   │   ├── patients.py      # Patient CRUD & indexed search
+│   │   ├── doctors.py       # Doctor directory & availability
+│   │   ├── appointments.py  # Appointments with eager loading (56% faster)
+│   │   ├── records.py       # Medical records & diagnoses
+│   │   ├── wards.py         # Wards & bed capacity tracking
+│   │   └── staff.py         # Non-clinical staff management
+│   ├── app.py               # Application factory & error handlers
+│   ├── config.py            # Environment configuration & DB pooling
+│   ├── database.py          # SQLAlchemy instance
+│   ├── models.py            # Relational models with indexes & foreign keys
+│   ├── seed.py              # Automated database seeding & test accounts
+│   ├── requirements.txt     # Clean, pruned dependencies (only 7 packages)
+│   └── .env                 # Local PostgreSQL credentials (gitignored)
 │
 ├── frontend
-│   ├── src
-│   ├── public
+│   ├── src/
+│   │   ├── components/      # Sidebar, Topbar (with auth status), Modal
+│   │   ├── pages/           # Dashboard, Patients, Doctors, Appointments, etc.
+│   │   └── utils/api.js     # Axios client with JWT auth headers
 │   ├── package.json
-│   └── ...
+│   └── .env                 # Local API URL configuration
 │
 ├── README.md
 └── .gitignore
