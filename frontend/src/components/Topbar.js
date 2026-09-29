@@ -19,7 +19,7 @@ const DEMO_ROLES = [
   { label: 'Admin', username: 'admin', pass: 'admin123', role: 'admin', color: '#0f4c81' },
   { label: 'Doctor', username: 'doctor', pass: 'doctor123', role: 'doctor', color: '#00a99d' },
   { label: 'Nurse', username: 'nurse', pass: 'nurse123', role: 'nurse', color: '#e8534a' },
-  { label: 'Receptionist', username: 'receptionist', pass: 'reception123', role: 'receptionist', color: '#f5a623' },
+  { label: 'Receptionist', username: 'receptionist', pass: 'receptionist123', role: 'receptionist', color: '#f5a623' },
   { label: 'Staff', username: 'user', pass: 'user123', role: 'staff', color: '#7c3aed' },
 ];
 

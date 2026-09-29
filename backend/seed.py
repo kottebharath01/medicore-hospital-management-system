@@ -11,7 +11,7 @@ def seed_database():
         {"username": "admin", "email": "admin@hospital.com", "role": "admin", "password": "admin123"},
         {"username": "doctor", "email": "doctor@hospital.com", "role": "doctor", "password": "doctor123"},
         {"username": "nurse", "email": "nurse@hospital.com", "role": "nurse", "password": "nurse123"},
-        {"username": "receptionist", "email": "reception@hospital.com", "role": "receptionist", "password": "reception123"},
+        {"username": "receptionist", "email": "reception@hospital.com", "role": "receptionist", "password": "receptionist123"},
         {"username": "user", "email": "user@hospital.com", "role": "staff", "password": "user123"},
     ]
 
