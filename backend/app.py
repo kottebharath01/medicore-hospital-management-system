@@ -3,13 +3,33 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
 # Database configuration
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(BASE_DIR, 'hospital.db')}"
+
+db_url = os.environ.get('DATABASE_URL')
+if not db_url:
+    db_host = os.environ.get('DB_HOST')
+    db_port = os.environ.get('DB_PORT', '5432')
+    db_name = os.environ.get('DB_NAME')
+    db_user = os.environ.get('DB_USER')
+    db_password = os.environ.get('DB_PASSWORD')
+    if db_host and db_name and db_user:
+        db_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+if db_url:
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(BASE_DIR, 'hospital.db')}"
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -158,6 +178,7 @@ def seed_database():
             Doctor(name='Dr. Arjun Nair',       specialization='Oncology',      phone='9876543215', email='arjun@hospital.com',   experience=18, fee=1200, available=True),
         ]
         db.session.add_all(doctors)
+        db.session.commit()
 
     if Patient.query.count() == 0:
         patients = [
@@ -168,6 +189,7 @@ def seed_database():
             Patient(name='Venkat Reddy',  age=61, gender='Male',   blood_group='A-',  phone='9123456784', email='venkat@email.com', address='Guntur, AP'),
         ]
         db.session.add_all(patients)
+        db.session.commit()
 
     if Ward.query.count() == 0:
         wards = [
@@ -178,6 +200,7 @@ def seed_database():
             Ward(name='Cardiology',     ward_type='Specialty', capacity=12, occupied=4,  floor=4),
         ]
         db.session.add_all(wards)
+        db.session.commit()
 
     if Staff.query.count() == 0:
         staff = [
@@ -188,30 +211,33 @@ def seed_database():
             Staff(name='Divya Krishna',  role='Nurse',          department='Pediatrics', phone='9000000005', email='divya@hospital.com',    shift='Night'),
         ]
         db.session.add_all(staff)
+        db.session.commit()
 
     if Appointment.query.count() == 0:
-        appts = [
-            Appointment(patient_id=1, doctor_id=1, date=date(2025, 7, 5),  time='10:00', status='Scheduled'),
-            Appointment(patient_id=2, doctor_id=2, date=date(2025, 7, 6),  time='11:30', status='Scheduled'),
-            Appointment(patient_id=3, doctor_id=3, date=date(2025, 6, 20), time='09:00', status='Completed'),
-            Appointment(patient_id=4, doctor_id=4, date=date(2025, 6, 22), time='14:00', status='Completed'),
-            Appointment(patient_id=5, doctor_id=1, date=date(2025, 7, 8),  time='16:00', status='Scheduled'),
-        ]
-        db.session.add_all(appts)
+        # Get existing patients and doctors
+        p_list = Patient.query.order_by(Patient.id).all()
+        d_list = Doctor.query.order_by(Doctor.id).all()
+        if p_list and d_list:
+            appts = [
+                Appointment(patient_id=p_list[0].id, doctor_id=d_list[0].id, date=date(2025, 7, 5),  time='10:00', status='Scheduled'),
+                Appointment(patient_id=p_list[1 % len(p_list)].id, doctor_id=d_list[1 % len(d_list)].id, date=date(2025, 7, 6),  time='11:30', status='Scheduled'),
+                Appointment(patient_id=p_list[2 % len(p_list)].id, doctor_id=d_list[2 % len(d_list)].id, date=date(2025, 6, 20), time='09:00', status='Completed'),
+                Appointment(patient_id=p_list[3 % len(p_list)].id, doctor_id=d_list[3 % len(d_list)].id, date=date(2025, 6, 22), time='14:00', status='Completed'),
+                Appointment(patient_id=p_list[4 % len(p_list)].id, doctor_id=d_list[0].id, date=date(2025, 7, 8),  time='16:00', status='Scheduled'),
+            ]
+            db.session.add_all(appts)
+            db.session.commit()
 
     if MedicalRecord.query.count() == 0:
-        records = [
-            MedicalRecord(patient_id=3, doctor_id=3, diagnosis='Knee ligament sprain', prescription='Ibuprofen 400mg, Physiotherapy', notes='Follow up in 2 weeks', date=date(2025, 6, 20)),
-            MedicalRecord(patient_id=4, doctor_id=4, diagnosis='Seasonal flu',          prescription='Paracetamol 500mg, Rest',        notes='Recover fully before next visit', date=date(2025, 6, 22)),
-        ]
-        db.session.add_all(records)
-
-    db.session.commit()
-
-# Initialize database
-with app.app_context():
-    db.create_all()
-    seed_database()
+        p_list = Patient.query.order_by(Patient.id).all()
+        d_list = Doctor.query.order_by(Doctor.id).all()
+        if len(p_list) >= 4 and len(d_list) >= 4:
+            records = [
+                MedicalRecord(patient_id=p_list[2].id, doctor_id=d_list[2].id, diagnosis='Knee ligament sprain', prescription='Ibuprofen 400mg, Physiotherapy', notes='Follow up in 2 weeks', date=date(2025, 6, 20)),
+                MedicalRecord(patient_id=p_list[3].id, doctor_id=d_list[3].id, diagnosis='Seasonal flu',          prescription='Paracetamol 500mg, Rest',        notes='Recover fully before next visit', date=date(2025, 6, 22)),
+            ]
+            db.session.add_all(records)
+            db.session.commit()
 
 
 # ─── Dashboard Stats ──────────────────────────────────────────────────────────
