@@ -10,6 +10,7 @@ import Appointments from './pages/Appointments';
 import Records      from './pages/Records';
 import Wards        from './pages/Wards';
 import Staff        from './pages/Staff';
+import Departments  from './pages/Departments';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
           <Topbar />
           <Routes>
             <Route path="/"             element={<Dashboard />} />
+            <Route path="/departments" element={<Departments />} />
             <Route path="/patients"     element={<Patients />} />
             <Route path="/doctors"      element={<Doctors />} />
             <Route path="/appointments" element={<Appointments />} />

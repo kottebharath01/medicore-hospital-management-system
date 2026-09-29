@@ -24,10 +24,20 @@ API.interceptors.request.use((config) => {
 export const loginUser = (credentials) => API.post("/auth/login", credentials);
 export const registerUser = (userData) => API.post("/auth/register", userData);
 export const getCurrentUser = () => API.get("/auth/me");
+export const changePassword = (passwords) => API.post("/auth/change-password", passwords);
 export const getUsers = () => API.get("/users");
+export const createStaffUser = (data) => API.post("/users", data);
 
 // Dashboard
 export const getDashboard = () => API.get("/dashboard");
+export const getBedOccupancy = () => API.get("/dashboard/bed-occupancy");
+
+// Departments
+export const getDepartments = () => API.get("/departments");
+export const getDepartment = (id) => API.get(`/departments/${id}`);
+export const createDepartment = (data) => API.post("/departments", data);
+export const updateDepartment = (id, data) => API.put(`/departments/${id}`, data);
+export const deleteDepartment = (id) => API.delete(`/departments/${id}`);
 
 // Patients
 export const getPatients = (q = "") => API.get(`/patients?q=${q}`);
@@ -37,15 +47,17 @@ export const updatePatient = (id, data) => API.put(`/patients/${id}`, data);
 export const deletePatient = (id) => API.delete(`/patients/${id}`);
 
 // Doctors
-export const getDoctors = (q = "") => API.get(`/doctors?q=${q}`);
+export const getDoctors = (q = "", deptId = "") =>
+  API.get(`/doctors?q=${q}${deptId ? `&department_id=${deptId}` : ""}`);
 export const getDoctor = (id) => API.get(`/doctors/${id}`);
 export const createDoctor = (data) => API.post("/doctors", data);
 export const updateDoctor = (id, data) => API.put(`/doctors/${id}`, data);
 export const deleteDoctor = (id) => API.delete(`/doctors/${id}`);
 
 // Appointments
-export const getAppointments = (status = "") =>
-  API.get(`/appointments${status ? `?status=${status}` : ""}`);
+export const getAppointments = (status = "", doctorId = "") =>
+  API.get(`/appointments${status ? `?status=${status}` : ""}${doctorId ? `&doctor_id=${doctorId}` : ""}`);
+export const getMyAppointments = () => API.get("/appointments/my");
 export const createAppointment = (data) => API.post("/appointments", data);
 export const updateAppointment = (id, data) => API.put(`/appointments/${id}`, data);
 export const deleteAppointment = (id) => API.delete(`/appointments/${id}`);
@@ -56,11 +68,23 @@ export const getRecords = (patientId = "") =>
 export const createRecord = (data) => API.post("/records", data);
 export const deleteRecord = (id) => API.delete(`/records/${id}`);
 
-// Wards
+// Wards & Beds
 export const getWards = () => API.get("/wards");
+export const getWard = (id) => API.get(`/wards/${id}`);
 export const createWard = (data) => API.post("/wards", data);
 export const updateWard = (id, data) => API.put(`/wards/${id}`, data);
 export const deleteWard = (id) => API.delete(`/wards/${id}`);
+
+export const getAllBeds = (params = "") => API.get(`/wards/beds${params ? `?${params}` : ""}`);
+export const createBed = (data) => API.post("/wards/beds", data);
+export const updateBed = (id, data) => API.put(`/wards/beds/${id}`, data);
+export const deleteBed = (id) => API.delete(`/wards/beds/${id}`);
+
+// Nursing Vitals
+export const getVitals = (patientId = "") =>
+  API.get(`/vitals${patientId ? `?patient_id=${patientId}` : ""}`);
+export const recordVitals = (data) => API.post("/vitals", data);
+export const deleteVitals = (id) => API.delete(`/vitals/${id}`);
 
 // Staff
 export const getStaff = () => API.get("/staff");

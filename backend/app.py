@@ -14,6 +14,8 @@ from routes.appointments import appointments_bp
 from routes.records import records_bp
 from routes.wards import wards_bp
 from routes.staff import staff_bp
+from routes.departments import departments_bp
+from routes.vitals import vitals_bp
 
 
 class ApiPrefixMiddleware:
@@ -50,6 +52,8 @@ def create_app():
     app.register_blueprint(records_bp)
     app.register_blueprint(wards_bp)
     app.register_blueprint(staff_bp)
+    app.register_blueprint(departments_bp)
+    app.register_blueprint(vitals_bp)
 
     # Health check endpoints
     @app.route("/")
