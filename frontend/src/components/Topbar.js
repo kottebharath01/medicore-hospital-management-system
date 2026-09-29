@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, LogIn, LogOut, Shield } from 'lucide-react';
+import { Bell, LogIn, LogOut, Shield, RefreshCw } from 'lucide-react';
 import { loginUser } from '../utils/api';
 import Modal from './Modal';
 import toast from 'react-hot-toast';
@@ -14,6 +14,14 @@ const titles = {
   '/wards':        ['Wards & Beds',   'Facility occupancy overview'],
   '/staff':        ['Staff',          'Non-clinical personnel'],
 };
+
+const DEMO_ROLES = [
+  { label: 'Admin', username: 'admin', pass: 'admin123', role: 'admin', color: '#0f4c81' },
+  { label: 'Doctor', username: 'doctor', pass: 'doctor123', role: 'doctor', color: '#00a99d' },
+  { label: 'Nurse', username: 'nurse', pass: 'nurse123', role: 'nurse', color: '#e8534a' },
+  { label: 'Receptionist', username: 'receptionist', pass: 'reception123', role: 'receptionist', color: '#f5a623' },
+  { label: 'Staff', username: 'user', pass: 'user123', role: 'staff', color: '#7c3aed' },
+];
 
 export default function Topbar() {
   const loc = useLocation();
@@ -34,15 +42,6 @@ export default function Topbar() {
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // If not logged in on initial load, default to admin session for easy evaluation
-    if (!user) {
-      const defaultUser = { username: 'admin', role: 'admin', email: 'admin@hospital.com' };
-      setUser(defaultUser);
-      localStorage.setItem('user', JSON.stringify(defaultUser));
-    }
-  }, [user]);
-
   async function handleLogin(u = username, p = password) {
     setLoading(true);
     try {
@@ -51,7 +50,7 @@ export default function Topbar() {
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
-      toast.success(`Welcome, ${userData.username}!`);
+      toast.success(`Welcome, ${userData.username} (${userData.role})!`);
       setModal(false);
     } catch (err) {
       const msg = err.response?.data?.error || (err.response ? 'Invalid credentials' : 'Could not reach server. Please check backend connection.');
@@ -65,7 +64,7 @@ export default function Topbar() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-    toast.success('Signed out');
+    toast.success('Logged out successfully');
   }
 
   const initials = user ? user.username.slice(0, 2).toUpperCase() : 'GU';
@@ -74,7 +73,7 @@ export default function Topbar() {
     <header className="topbar">
       <div className="topbar-title">
         <h2>{title}</h2>
-        <p>{user ? `${sub} • Logged in as ${user.username} (${user.role})` : sub}</p>
+        <p>{user ? `${sub} • Logged in as ${user.username} (${user.role})` : `${sub} • Guest Mode`}</p>
       </div>
 
       <div className="topbar-right">
@@ -86,20 +85,28 @@ export default function Topbar() {
             <div className="topbar-avatar" title={`${user.username} (${user.role})`}>
               {initials}
             </div>
+            <button
+              className="btn btn-outline"
+              style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
+              title="Switch to another role or account"
+              onClick={() => setModal(true)}
+            >
+              <RefreshCw size={12} /> Switch Role
+            </button>
             <button className="btn-icon danger" title="Sign Out" onClick={handleLogout}>
               <LogOut size={16} />
             </button>
           </div>
         ) : (
-          <button className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => setModal(true)}>
-            <LogIn size={14} /> Sign In
+          <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setModal(true)}>
+            <LogIn size={15} /> Sign In
           </button>
         )}
       </div>
 
       {modal && (
         <Modal
-          title="Sign In to MediCore"
+          title={user ? `Switch Account (Current: ${user.username})` : "Sign In to MediCore"}
           onClose={() => setModal(false)}
           footer={
             <>
@@ -111,6 +118,46 @@ export default function Topbar() {
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ background: '#f8fafc', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-color)', marginBottom: 8 }}>
+                <Shield size={15} color="var(--primary-color)" /> Quick Demo Role Login:
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 10 }}>
+                Select any hospital role below to immediately sign in and switch roles:
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8 }}>
+                {DEMO_ROLES.map((r) => (
+                  <button
+                    key={r.username}
+                    type="button"
+                    className="btn btn-outline"
+                    style={{
+                      padding: '8px 10px',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 3,
+                      borderLeft: `3px solid ${r.color}`,
+                    }}
+                    onClick={() => {
+                      setUsername(r.username);
+                      setPassword(r.pass);
+                      handleLogin(r.username, r.pass);
+                    }}
+                    disabled={loading}
+                  >
+                    <span style={{ fontWeight: 600, color: 'var(--text-color)' }}>{r.label}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{r.username}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center', margin: '2px 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              — or sign in with custom credentials —
+            </div>
+
             <div className="form-group">
               <label className="form-label">Username or Email</label>
               <input
@@ -129,30 +176,6 @@ export default function Topbar() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
               />
-            </div>
-
-            <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
-                <Shield size={14} /> Quick Demo Login:
-              </div>
-              <div className="flex gap-8">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ flex: 1, fontSize: '0.75rem', padding: '6px 8px' }}
-                  onClick={() => { setUsername('admin'); setPassword('admin123'); handleLogin('admin', 'admin123'); }}
-                >
-                  Admin (admin123)
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ flex: 1, fontSize: '0.75rem', padding: '6px 8px' }}
-                  onClick={() => { setUsername('user'); setPassword('user123'); handleLogin('user', 'user123'); }}
-                >
-                  User (user123)
-                </button>
-              </div>
             </div>
           </div>
         </Modal>

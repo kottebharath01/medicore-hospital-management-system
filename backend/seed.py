@@ -6,22 +6,24 @@ from models import User, Doctor, Patient, Ward, Staff, Appointment, MedicalRecor
 def seed_database():
     """Seed initial sample data if tables are empty."""
 
-    # 1. Users (ensure admin and user exist with verified credentials)
-    admin_user = User.query.filter_by(username="admin").first()
-    if not admin_user:
-        admin_user = User(username="admin", email="admin@hospital.com", role="admin")
-        admin_user.set_password("admin123")
-        db.session.add(admin_user)
-    else:
-        admin_user.set_password("admin123")
+    # 1. Users (ensure accounts for all key hospital roles exist)
+    demo_accounts = [
+        {"username": "admin", "email": "admin@hospital.com", "role": "admin", "password": "admin123"},
+        {"username": "doctor", "email": "doctor@hospital.com", "role": "doctor", "password": "doctor123"},
+        {"username": "nurse", "email": "nurse@hospital.com", "role": "nurse", "password": "nurse123"},
+        {"username": "receptionist", "email": "reception@hospital.com", "role": "receptionist", "password": "reception123"},
+        {"username": "user", "email": "user@hospital.com", "role": "staff", "password": "user123"},
+    ]
 
-    regular_user = User.query.filter_by(username="user").first()
-    if not regular_user:
-        regular_user = User(username="user", email="user@hospital.com", role="user")
-        regular_user.set_password("user123")
-        db.session.add(regular_user)
-    else:
-        regular_user.set_password("user123")
+    for acc in demo_accounts:
+        u = User.query.filter_by(username=acc["username"]).first()
+        if not u:
+            u = User(username=acc["username"], email=acc["email"], role=acc["role"])
+            u.set_password(acc["password"])
+            db.session.add(u)
+        else:
+            u.role = acc["role"]
+            u.set_password(acc["password"])
 
     db.session.commit()
 
