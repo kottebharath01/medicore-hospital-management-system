@@ -543,27 +543,24 @@ tbody tr:hover { background: #fafdff; }
 /* ─── Authentication & Login Screen ──────────────────────────────────────── */
 .login-page {
   min-height: 100vh;
-  width: 100vw;
+  width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
+  justify-content: flex-start;
+  padding: 40px 16px 80px;
   background: radial-gradient(circle at top right, #e6f6f4, #f8fafc 60%);
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 9999;
   overflow-y: auto;
 }
 
 .login-card {
-  width: min(100%, 460px);
+  width: min(100%, 480px);
   padding: 36px 32px;
   background: var(--surface);
   border-radius: 16px;
   border: 1px solid var(--border);
   box-shadow: 0 16px 40px rgba(15, 34, 58, 0.12);
-  margin: auto;
+  margin: auto 0;
 }
 
 .login-card h2 {

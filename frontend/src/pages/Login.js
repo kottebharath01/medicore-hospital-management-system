@@ -8,25 +8,14 @@ import {
   User,
   Mail,
   Phone,
-  ShieldCheck,
   ArrowRight,
   UserPlus,
   LogIn,
-  KeyRound,
-  Stethoscope,
-  Activity,
+  CheckCircle2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-
-const DEMO_ACCOUNTS = [
-  { label: 'Admin', username: 'admin', password: 'admin123', color: '#1a365d' },
-  { label: 'Doctor', username: 'doctor', password: 'doctor123', color: '#00a99d' },
-  { label: 'Nurse', username: 'nurse', password: 'nurse123', color: '#7c3aed' },
-  { label: 'Receptionist', username: 'receptionist', password: 'receptionist123', color: '#d97706' },
-  { label: 'Patient', username: 'patient', password: 'patient123', color: '#0284c7' },
-];
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -36,15 +25,16 @@ export default function Login() {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [loading, setLoading] = useState(false);
 
-  // Login form state
+  // Manual login form state — no pre-filled credentials
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
 
-  // Registration form state (Patients only)
+  // Patient registration form state
   const [regForm, setRegForm] = useState({
     name: '',
     username: '',
     email: '',
     password: '',
+    confirm_password: '',
     phone: '',
     age: '',
     gender: 'Male',
@@ -73,19 +63,26 @@ export default function Login() {
 
   async function handleLoginSubmit(e) {
     if (e) e.preventDefault();
-    if (!loginForm.username.trim() || !loginForm.password) {
-      return toast.error('Please enter both username and password');
+    const uname = loginForm.username.trim();
+    const pwd = loginForm.password;
+
+    if (!uname || !pwd) {
+      return toast.error('Please enter both username/email and password');
     }
 
     setLoading(true);
     try {
-      const res = await loginUser(loginForm);
+      const res = await loginUser({ username: uname, password: pwd });
       const { token, user } = res.data;
       login(token, user);
       toast.success(res.data.message || `Welcome back, ${user.name || user.username}!`);
       navigate(from, { replace: true });
     } catch (err) {
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Login failed. Please check credentials.');
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Authentication failed. Please verify your credentials.';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -93,36 +90,39 @@ export default function Login() {
 
   async function handleRegisterSubmit(e) {
     e.preventDefault();
-    if (!regForm.name.trim() || !regForm.username.trim() || !regForm.email.trim() || !regForm.password) {
-      return toast.error('Name, username, email, and password are required');
+    if (!regForm.name.trim()) return toast.error('Full legal name is required');
+    if (!regForm.username.trim()) return toast.error('Username is required');
+    if (!regForm.email.trim()) return toast.error('Email address is required');
+    if (!regForm.password) return toast.error('Password is required');
+    if (regForm.password.length < 6) return toast.error('Password must be at least 6 characters long');
+    if (regForm.password !== regForm.confirm_password) {
+      return toast.error('Passwords do not match. Please re-enter matching passwords.');
     }
 
     setLoading(true);
     try {
-      const res = await registerUser(regForm);
+      const payload = {
+        name: regForm.name.trim(),
+        username: regForm.username.trim(),
+        email: regForm.email.trim(),
+        password: regForm.password,
+        phone: regForm.phone.trim(),
+        age: regForm.age ? parseInt(regForm.age, 10) : 30,
+        gender: regForm.gender,
+        blood_group: regForm.blood_group,
+      };
+
+      const res = await registerUser(payload);
       const { token, user } = res.data;
       login(token, user);
-      toast.success(res.data.message || `Account created! Your Patient ID is ${user.code || 'PAT-0001'}`);
+      toast.success(res.data.message || `Registration successful! Your Patient ID is ${user.code || 'PAT-0001'}`);
       navigate('/', { replace: true });
     } catch (err) {
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Quick 1-click demo login
-  async function handleDemoLogin(account) {
-    setLoginForm({ username: account.username, password: account.password });
-    setLoading(true);
-    try {
-      const res = await loginUser({ username: account.username, password: account.password });
-      const { token, user } = res.data;
-      login(token, user);
-      toast.success(`Logged in as ${account.label} (${user.name})`);
-      navigate(from, { replace: true });
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Demo login failed');
+      const errorMsg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Registration failed. Please check the entered details.';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ export default function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
-        {/* Logo and Title */}
+        {/* Hospital Branding Header */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div
             style={{
@@ -157,7 +157,7 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Tab Switcher */}
+        {/* Tab Switcher: Sign In vs Patient Signup */}
         <div
           style={{
             display: 'flex',
@@ -216,7 +216,7 @@ export default function Login() {
           </button>
         </div>
 
-        {/* MODE 1: SIGN IN */}
+        {/* ─── FORM 1: MANUAL SIGN IN ─── */}
         {mode === 'login' && (
           <form onSubmit={handleLoginSubmit}>
             <div className="form-group" style={{ marginBottom: 16 }}>
@@ -229,7 +229,7 @@ export default function Login() {
                 name="username"
                 value={loginForm.username}
                 onChange={handleLoginChange}
-                placeholder="e.g. admin, doctor, or patient"
+                placeholder="Enter your username or email"
                 required
                 autoComplete="username"
                 autoFocus
@@ -246,7 +246,7 @@ export default function Login() {
                 name="password"
                 value={loginForm.password}
                 onChange={handleLoginChange}
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 required
                 autoComplete="current-password"
               />
@@ -256,79 +256,48 @@ export default function Login() {
               type="submit"
               className="btn btn-primary login-submit"
               disabled={loading}
-              style={{ width: '100%', height: 42, fontSize: '0.92rem' }}
+              style={{ width: '100%', height: 44, fontSize: '0.92rem' }}
             >
-              {loading ? 'Authenticating…' : (
+              {loading ? 'Verifying Credentials…' : (
                 <>
                   Sign In <ArrowRight size={15} />
                 </>
               )}
             </button>
-
-            {/* Quick Demo Credentials */}
-            <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
-              <div
-                style={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  marginBottom: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <KeyRound size={13} /> 1-Click Role Login Demo:
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <button
-                    key={acc.label}
-                    type="button"
-                    onClick={() => handleDemoLogin(acc)}
-                    disabled={loading}
-                    style={{
-                      background: 'var(--bg-main)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 6,
-                      padding: '4px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      color: acc.color,
-                      cursor: 'pointer',
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => (e.target.style.background = '#e2e8f0')}
-                    onMouseLeave={(e) => (e.target.style.background = 'var(--bg-main)')}
-                  >
-                    {acc.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </form>
         )}
 
-        {/* MODE 2: PATIENT REGISTRATION */}
+        {/* ─── FORM 2: PATIENT REGISTRATION ─── */}
         {mode === 'register' && (
           <form onSubmit={handleRegisterSubmit}>
-            <div style={{ marginBottom: 12, padding: '8px 12px', background: '#e0f2fe', borderRadius: 8, fontSize: '0.78rem', color: '#0369a1' }}>
-              <strong>Public Registration:</strong> Self-registration creates a <strong>Patient</strong> account with a unique <code>PAT-xxxx</code> ID. Staff accounts are managed by administrators.
+            <div
+              style={{
+                marginBottom: 16,
+                padding: '10px 14px',
+                background: '#e0f2fe',
+                borderRadius: 8,
+                fontSize: '0.78rem',
+                color: '#0369a1',
+                lineHeight: 1.4,
+              }}
+            >
+              <strong>Patient Registration:</strong> Create your patient portal account to schedule consultations, review medical records, and view prescriptions.
             </div>
 
-            <div className="form-group" style={{ marginBottom: 12 }}>
+            <div className="form-group" style={{ marginBottom: 14 }}>
               <label className="form-label">Full Legal Name *</label>
               <input
                 className="form-control"
                 name="name"
                 value={regForm.name}
                 onChange={handleRegChange}
-                placeholder="e.g. Johnathan Doe"
+                placeholder="e.g. Rahul Sharma"
                 required
+                autoFocus
               />
             </div>
 
-            <div className="form-grid" style={{ marginBottom: 12 }}>
+            <div className="form-grid" style={{ marginBottom: 14 }}>
               <div className="form-group">
                 <label className="form-label">Age *</label>
                 <input
@@ -339,27 +308,29 @@ export default function Login() {
                   max="120"
                   value={regForm.age}
                   onChange={handleRegChange}
-                  placeholder="e.g. 32"
+                  placeholder="e.g. 29"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Gender</label>
+                <label className="form-label">Gender *</label>
                 <select className="form-control" name="gender" value={regForm.gender} onChange={handleRegChange}>
-                  <option>Male</option>
-                  <option>Female</option>
-                  <option>Other</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
             </div>
 
-            <div className="form-grid" style={{ marginBottom: 12 }}>
+            <div className="form-grid" style={{ marginBottom: 14 }}>
               <div className="form-group">
                 <label className="form-label">Blood Group</label>
                 <select className="form-control" name="blood_group" value={regForm.blood_group} onChange={handleRegChange}>
                   {BLOOD_GROUPS.map((bg) => (
-                    <option key={bg} value={bg}>{bg}</option>
+                    <option key={bg} value={bg}>
+                      {bg}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -376,7 +347,7 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="form-group" style={{ marginBottom: 12 }}>
+            <div className="form-group" style={{ marginBottom: 14 }}>
               <label className="form-label">Email Address *</label>
               <input
                 className="form-control"
@@ -384,25 +355,25 @@ export default function Login() {
                 name="email"
                 value={regForm.email}
                 onChange={handleRegChange}
-                placeholder="you@email.com"
+                placeholder="patient@email.com"
                 required
               />
             </div>
 
-            <div className="form-grid" style={{ marginBottom: 16 }}>
-              <div className="form-group">
-                <label className="form-label">Username *</label>
-                <input
-                  className="form-control"
-                  name="username"
-                  value={regForm.username}
-                  onChange={handleRegChange}
-                  placeholder="choose username"
-                  required
-                  autoComplete="username"
-                />
-              </div>
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label">Username *</label>
+              <input
+                className="form-control"
+                name="username"
+                value={regForm.username}
+                onChange={handleRegChange}
+                placeholder="Choose a username"
+                required
+                autoComplete="username"
+              />
+            </div>
 
+            <div className="form-grid" style={{ marginBottom: 18 }}>
               <div className="form-group">
                 <label className="form-label">Password *</label>
                 <input
@@ -411,7 +382,21 @@ export default function Login() {
                   name="password"
                   value={regForm.password}
                   onChange={handleRegChange}
-                  placeholder="min 6 chars"
+                  placeholder="Min 6 characters"
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Confirm Password *</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  name="confirm_password"
+                  value={regForm.confirm_password}
+                  onChange={handleRegChange}
+                  placeholder="Re-enter password"
                   required
                   autoComplete="new-password"
                 />
@@ -422,11 +407,11 @@ export default function Login() {
               type="submit"
               className="btn btn-primary login-submit"
               disabled={loading}
-              style={{ width: '100%', height: 42, fontSize: '0.92rem' }}
+              style={{ width: '100%', height: 44, fontSize: '0.92rem' }}
             >
-              {loading ? 'Creating Account…' : (
+              {loading ? 'Creating Patient Account…' : (
                 <>
-                  <UserPlus size={15} /> Create Patient Account
+                  <UserPlus size={15} /> Register
                 </>
               )}
             </button>
