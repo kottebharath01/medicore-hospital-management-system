@@ -16,6 +16,19 @@ from routes.wards import wards_bp
 from routes.staff import staff_bp
 
 
+class ApiPrefixMiddleware:
+    """WSGI middleware ensuring routes like /dashboard or /auth/login transparently resolve to /api/... if /api was omitted by the client."""
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        path = environ.get("PATH_INFO", "")
+        # If the request path does not start with /api and is not root / or docs
+        if path and not path.startswith("/api") and path != "/":
+            environ["PATH_INFO"] = "/api" + path
+        return self.wsgi_app(environ, start_response)
+
+
 def create_app():
     """Application factory for Hospital Management System backend."""
     app = Flask(__name__)
@@ -38,6 +51,16 @@ def create_app():
     app.register_blueprint(wards_bp)
     app.register_blueprint(staff_bp)
 
+    # Health check endpoints
+    @app.route("/")
+    @app.route("/api")
+    def health():
+        return jsonify({
+            "status": "healthy",
+            "service": "MediCore HMS API",
+            "message": "Hospital Management System backend running smoothly."
+        }), 200
+
     # Clean JSON error handlers
     @app.errorhandler(400)
     def bad_request(error):
@@ -56,6 +79,9 @@ def create_app():
         db.create_all()
         seed_database()
 
+    # Wrap WSGI app with prefix middleware for seamless routing
+    app.wsgi_app = ApiPrefixMiddleware(app.wsgi_app)
+
     return app
 
 
@@ -64,3 +90,4 @@ app = create_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+

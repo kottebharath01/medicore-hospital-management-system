@@ -1,7 +1,14 @@
 import axios from "axios";
 
+// Ensure API base URL is properly formatted with /api suffix
+let rawBaseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+rawBaseUrl = rawBaseUrl.trim().replace(/\/+$/, "");
+if (!rawBaseUrl.endsWith("/api")) {
+  rawBaseUrl += "/api";
+}
+
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
+  baseURL: rawBaseUrl,
 });
 
 // Attach JWT token to requests if available

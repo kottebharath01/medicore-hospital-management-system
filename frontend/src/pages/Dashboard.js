@@ -39,16 +39,52 @@ function StatusBadge({ status }) {
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchDashboard = () => {
+    setLoading(true);
+    setError(null);
+    getDashboard()
+      .then((r) => {
+        setData(r.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Dashboard error:", err);
+        setError("Unable to connect to the hospital backend. If the server is on a free tier spin-up, please wait a moment and click Retry.");
+        setLoading(false);
+      });
+  };
 
   useEffect(() => {
-    getDashboard().then(r => setData(r.data)).catch(console.error);
+    fetchDashboard();
   }, []);
 
-  if (!data) return (
-    <div className="page">
-      <div className="loading-spinner"><div className="spinner"/><span>Loading dashboard…</span></div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="loading-spinner">
+          <div className="spinner" />
+          <span>Loading dashboard…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="page">
+        <div className="card" style={{ maxWidth: 500, margin: "60px auto", textAlign: "center", padding: 32 }}>
+          <h3 style={{ marginBottom: 12, color: "var(--text-color)" }}>Connection Notice</h3>
+          <p style={{ color: "var(--text-muted)", marginBottom: 20 }}>{error || "Unable to load dashboard data."}</p>
+          <button className="btn btn-primary" onClick={fetchDashboard} style={{ margin: "0 auto" }}>
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const { stats, recent_appointments } = data;
   const bedPct = stats.total_beds ? Math.round((stats.occupied_beds / stats.total_beds) * 100) : 0;

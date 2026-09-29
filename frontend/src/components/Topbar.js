@@ -54,7 +54,8 @@ export default function Topbar() {
       toast.success(`Welcome, ${userData.username}!`);
       setModal(false);
     } catch (err) {
-      toast.error('Invalid credentials');
+      const msg = err.response?.data?.error || (err.response ? 'Invalid credentials' : 'Could not reach server. Please check backend connection.');
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
